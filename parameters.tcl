@@ -1,0 +1,2 @@
+set_setting hal.sys_clk_timer none
+set_setting hal.timestamp_timer high_res_timer
