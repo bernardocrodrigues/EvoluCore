@@ -5,11 +5,12 @@ import time
 import parse
 from functools import reduce
 
-target ="/home/bcrodrigues/Documents/TCC/run/"
-base = "/home/bcrodrigues/Documents/TCC/base/"
+
+target = "/home/bcrodrigues/tcc/run/"
+base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
 code = "fractal"
 
-mode = 4
+mode = 1
 to_program = False
 
 def configure(q):
@@ -62,9 +63,14 @@ if mode <= 2:
     if returnCode != 0:
         exit()
 
+
+
 if mode <= 3:
     a = subprocess.run(["cp -a "+base+"quartus/. "+target], stdout=subprocess.PIPE, shell=True)
     a = subprocess.run(["quartus_sh --flow compile "+target+"base.qpf"], stdout=subprocess.PIPE, shell=True)
+
+
+exit()
 
 if mode <= 4:
     a = subprocess.run(["mkdir " + target+"software"], stdout=subprocess.PIPE, shell=True)
