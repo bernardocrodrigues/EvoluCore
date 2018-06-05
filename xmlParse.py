@@ -82,14 +82,14 @@ class qsysFactory:
 
 if __name__ == "__main__":
 
-    workingDir = "/home/bcrodrigues/Documents/TCC/base/qsys/"
+    workingDir = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/"
     baseFile = "baseOriginal.qsys"
     outputFile = "base.qsys"
 
     qFac = qsysFactory(workingDir, baseFile, outputFile)
 
-    nios = {'icache_size': '2000',
-            'dcache_size': '2000'}
+    nios = {'icache_size': '0',
+            'dcache_size': '0'}
 
     qFac.modifyNios(nios)
     qFac.writeCurrentQsys()

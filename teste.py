@@ -8,10 +8,10 @@ from functools import reduce
 
 target = "/home/bcrodrigues/tcc/run/"
 base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
-code = "fractal"
+code = "checksum"
 
-mode = 1
-to_program = False
+mode = 4
+to_program = True
 
 def configure(q):
     q.put(os.getpid())
@@ -63,14 +63,9 @@ if mode <= 2:
     if returnCode != 0:
         exit()
 
-
-
 if mode <= 3:
     a = subprocess.run(["cp -a "+base+"quartus/. "+target], stdout=subprocess.PIPE, shell=True)
     a = subprocess.run(["quartus_sh --flow compile "+target+"base.qpf"], stdout=subprocess.PIPE, shell=True)
-
-
-exit()
 
 if mode <= 4:
     a = subprocess.run(["mkdir " + target+"software"], stdout=subprocess.PIPE, shell=True)
