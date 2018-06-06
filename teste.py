@@ -8,9 +8,9 @@ from functools import reduce
 
 target = "/home/bcrodrigues/tcc/run/"
 base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
-code = "checksum"
+code = "fractal"
 
-mode = 4
+mode = 1
 to_program = True
 
 def configure(q):
