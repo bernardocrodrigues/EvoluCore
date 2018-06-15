@@ -1,15 +1,15 @@
 from lxml import etree
-import copy
+import copy, os
+import datetime
 
 class qsysFactory:
 
-    def __init__(self, workingDir, base, output):
+    def __init__(self, baseFile, targetDir):
 
-        self.__base = base
-        self.__workingDir = workingDir
-        self.__output = output
+        self.__base = baseFile
+        self.__target = targetDir
 
-        with open(workingDir + base,'r') as f:
+        with open(self.__base,'r') as f:
             output = f.read()
             output = output.encode('ascii')
             self.__baseXml = etree.fromstring(output)
@@ -32,64 +32,43 @@ class qsysFactory:
                         pass
                 break
 
-    def writeCurrentQsys(self):
-        with open(self.__workingDir + self.__output, 'wb') as f:
+    def writeCurrentQsys(self, fileName):
+        try:
+            if os.path.isdir(self.__target):
+                pass
+            else:
+                os.makedirs(self.__target)
+        except OSError:
+            print('Erro no setup das pastas')
+            exit(1)
+
+        with open(self.__target + fileName, 'wb') as f:
             f.write(etree.tostring(self.__currentXml))
 
+    def resetCurrentQsys(self):
+        self.__currentXml = copy.copy(self.__baseXml)
 
 
 
 
 
-    # for i in root:
-    #     if i.get('name') == 'nios2':
-    #         for x in i:
-    #             if x.get('name') == "icache_size":
-    #                 print(x.tag, end=' ')
-    #                 print(x.text, end=' ')
-    #                 print(x.get('name'), end=' ')
-    #                 print(x.get('value'))
-    #
-    #                 x.attrib['value'] = '0'
-    #
-    #                 print(x.tag, end=' ')
-    #                 print(x.text, end=' ')
-    #                 print(x.get('name'), end=' ')
-    #                 print(x.get('value'))
 
-
-    #a = StringIO(output)
-
-    #tree = etree.parse(a)
-
-#
-# # create XML
-# root = etree.Element('root')
-# root.append(etree.Element('child'))
-# # another child with text
-# child = etree.Element('child')
-# child.text = 'some text'
-# root.append(child)
-# pretty string
-#     s = etree.tostring(root, pretty_print=True)
-#     print(s.decode("utf-8"))
-
-
-
-# with open(base+"qsys/base.qsys", 'wb') as f:
-#     f.write(etree.tostring(root))
 
 
 if __name__ == "__main__":
 
-    workingDir = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/"
-    baseFile = "baseOriginal.qsys"
-    outputFile = "base.qsys"
+    baseFile = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/baseOriginal.qsys"
+    targetDir = "/home/bcrodrigues/tcc/qsys/"
 
-    qFac = qsysFactory(workingDir, baseFile, outputFile)
+    qFac = qsysFactory(baseFile, targetDir)
 
-    nios = {'icache_size': '0',
-            'dcache_size': '0'}
 
-    qFac.modifyNios(nios)
-    qFac.writeCurrentQsys()
+    for x in range(1,7):
+
+        nios = {'icache_size': str((x-1)*100),
+                'dcache_size': str((x-1)*100)}
+
+        qFac.modifyNios(nios)
+        qFac.writeCurrentQsys('q'+str(x)+'.qsys')
+        qFac.resetCurrentQsys()
+

@@ -1,31 +1,38 @@
 import os, subprocess, shutil
-from multiprocessing import Process
+from multiprocessing import Process, Queue
+import time
 
 
 class Generator(Process):
 
-    def __init__(self, workingDir, DirName, referenceDir):
+    def __init__(self, rootDir, toCompile, prefix):
+
         Process.__init__(self)
-        self.workingDir = workingDir + '/'+ DirName+'/'
-        self.referenceDir = referenceDir
+        self.__rootDir = rootDir
+        self.__workingDir = rootDir
+        self.__toCompile = toCompile
+        self.__current = None
+        self.__pid = None
+        self.__prefix = prefix
 
     def _setupFolder(self):
         try:
-            if os.path.isdir(self.workingDir):
-                shutil.rmtree(self.workingDir)
-                os.makedirs(self.workingDir)
+            if os.path.isdir(self.__workingDir):
+                shutil.rmtree(self.__workingDir)
+                os.makedirs(self.__workingDir)
             else:
-                os.makedirs(self.workingDir)
+                os.makedirs(self.__workingDir)
         except OSError:
             print('Erro no setup das pastas')
             exit(1)
+
     def _populateQsys(self):
 
-        shutil.copy2(self.referenceDir + '/qsys/base.qsys', self.workingDir)
-        code = subprocess.run(["qsys-generate", "--synthesis=VHDL", self.workingDir + "base.qsys"])
+        code = subprocess.run(["qsys-generate", "--synthesis=VHDL", self.__rootDir + '/qsys/'+self.__prefix+self.__current+'.qsys', "--output-directory="+self.__rootDir +'/'+self.__current])
         if code.returncode != 0:
             print('Erro na compilação do Qsys')
             exit()
+
     def _compileQuartus(self):
 
         code = subprocess.run(["cp", "-a", self.referenceDir+"quartus/.", self.workingDir])
@@ -39,10 +46,26 @@ class Generator(Process):
             exit()
 
     def run(self):
+        self.__pid = os.getpid()
 
-        self._setupFolder()
-        self._populateQsys()
-        self._compileQuartus()
+        while True:
+            try:
+                self.__current = str(self.__toCompile.get_nowait())
+            except Exception:
+                exit(0)
+            else:
+                print(str(self.__pid) + " " +self.__current)
+                self.__workingDir = self.__rootDir +'/'+self.__current+'/'
+                self._setupFolder()
+                self._populateQsys()
+
+
+
+
+
+            # self._setupFolder()
+            # self._populateQsys()
+            # self._compileQuartus()
 
 
 
@@ -55,30 +78,49 @@ if __name__ == '__main__':
 
     target = "/home/bcrodrigues/tcc/"
     base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
+    toCompile = Queue()
+    prefix = 'q'
 
-    gen = Generator(target, 'systemBench', base)
-    gen2 = Generator(target, 'systemBench2', base)
-    gen3 = Generator(target, 'systemBench3', base)
-    gen4 = Generator(target, 'systemBench4', base)
+    for x in range(1, 11):
+        toCompile.put(x)
 
 
-    # gen._setupFolder()
-    # gen._populateQsys()
-    # # gen2._compileQuartus()
-    #
-    # gen2._setupFolder()
-    # gen2._populateQsys()
-    #
-    # p = Process(target=gen._compileQuartus,  args=('RODANDO 1',))
-    # p2 = Process(target=gen2._compileQuartus, args=('RODANDO 2',))
 
+    start = time.time()
+
+    gen = Generator(target, toCompile, prefix)
+    gen2 = Generator(target, toCompile, prefix)
     gen.start()
     gen2.start()
-    gen3.start()
-    gen4.start()
-
     gen.join()
     gen2.join()
-    gen3.join()
-    gen4.join()
+
+    end = time.time()
+    print(end - start)
+
+    # gen = Generator(target, 'systemBench', base)
+    # gen2 = Generator(target, 'systemBench2', base)
+    # gen3 = Generator(target, 'systemBench3', base)
+    # gen4 = Generator(target, 'systemBench4', base)
+    #
+    #
+    # # gen._setupFolder()
+    # # gen._populateQsys()
+    # # # gen2._compileQuartus()
+    # #
+    # # gen2._setupFolder()
+    # # gen2._populateQsys()
+    # #
+    # # p = Process(target=gen._compileQuartus,  args=('RODANDO 1',))
+    # # p2 = Process(target=gen2._compileQuartus, args=('RODANDO 2',))
+    #
+    # gen.start()
+    # gen2.start()
+    # gen3.start()
+    # gen4.start()
+    #
+    # gen.join()
+    # gen2.join()
+    # gen3.join()
+    # gen4.join()
 
