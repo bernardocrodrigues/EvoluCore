@@ -63,7 +63,7 @@ if __name__ == "__main__":
     qFac = qsysFactory(baseFile, targetDir)
 
 
-    for x in range(1,7):
+    for x in range(1,11):
 
         nios = {'icache_size': str((x-1)*100),
                 'dcache_size': str((x-1)*100)}
