@@ -22,7 +22,7 @@ extern "C"
 /* Define the size of the memory block which will be used for
  * measuring the performance of off-chip memory SDRAM. 
  */
-#define CHECKSUM_MEMORY_BLOCK_SIZE 5000
+#define CHECKSUM_MEMORY_BLOCK_SIZE 4570
 
 /* The checksum_test function demonstrates the functionality of the
  * profiler by providing something to measure.  The test simply does a 

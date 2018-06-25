@@ -51,10 +51,6 @@ class qsysFactory:
 
 
 
-
-
-
-
 if __name__ == "__main__":
 
     baseFile = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/baseOriginal.qsys"
@@ -63,7 +59,7 @@ if __name__ == "__main__":
     qFac = qsysFactory(baseFile, targetDir)
 
 
-    for x in range(1,11):
+    for x in range(1,2):
 
         nios = {'icache_size': str((x-1)*100),
                 'dcache_size': str((x-1)*100)}

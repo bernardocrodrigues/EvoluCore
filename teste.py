@@ -82,7 +82,6 @@ if mode <= 5 and to_program:
 if mode <= 6:
 
     confiredProperly = False
-
     while not confiredProperly:
         returnCode = -1
         retry = -1
@@ -105,7 +104,6 @@ if mode <= 6:
     time.sleep(0.5)
 
     gotBenchmark = False
-
     while not gotBenchmark:
         p = subprocess.Popen('nios2-terminal -o 60', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
 
