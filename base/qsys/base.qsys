@@ -198,12 +198,12 @@
   <parameter name="data_master_high_performance_paddr_size" value="0" />
   <parameter name="data_master_paddr_base" value="0" />
   <parameter name="data_master_paddr_size" value="0" />
-  <parameter name="dcache_bursts" value="false" />
+  <parameter name="dcache_bursts" value="true" />
   <parameter name="dcache_numTCDM" value="0" />
   <parameter name="dcache_ramBlockType" value="Automatic" />
-  <parameter name="dcache_size" value="0" />
+  <parameter name="dcache_size" value="512" />
   <parameter name="dcache_tagramBlockType" value="Automatic" />
-  <parameter name="dcache_victim_buf_impl" value="ram" />
+  <parameter name="dcache_victim_buf_impl" value="reg" />
   <parameter name="debug_OCIOnchipTrace" value="_128" />
   <parameter name="debug_assignJtagInstanceID" value="false" />
   <parameter name="debug_datatrigger" value="0" />
@@ -225,10 +225,10 @@
   <parameter name="fa_cache_linesize" value="0" />
   <parameter name="flash_instruction_master_paddr_base" value="0" />
   <parameter name="flash_instruction_master_paddr_size" value="0" />
-  <parameter name="icache_burstType" value="None" />
+  <parameter name="icache_burstType" value="Sequential" />
   <parameter name="icache_numTCIM" value="0" />
   <parameter name="icache_ramBlockType" value="Automatic" />
-  <parameter name="icache_size" value="0" />
+  <parameter name="icache_size" value="512" />
   <parameter name="icache_tagramBlockType" value="Automatic" />
   <parameter name="impl" value="Fast" />
   <parameter name="instAddrWidth" value="19" />

@@ -2,11 +2,22 @@ import os, subprocess, shutil
 from multiprocessing import Process, Queue
 import time
 from functools import reduce
+import parse
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 
 class Generator(Process):
 
-    def __init__(self, rootDir, toCompile, prefix, referenceDir, ):
+    def __init__(self, rootDir, toCompile, prefix, referenceDir, toBenchmark):
 
         Process.__init__(self)
         self.__rootDir = rootDir
@@ -16,6 +27,7 @@ class Generator(Process):
         self.__pid = None
         self.__prefix = prefix
         self.__referenceDir = referenceDir
+        self.__toBenchmark = toBenchmark
 
     def _setupFolder(self):
         try:
@@ -65,7 +77,7 @@ class Generator(Process):
             print('Erro na compilação do quartus')
             exit()
 
-    def _compileSoftware(self, code):
+    def _compileSoftware(self, bench):
 
         os.makedirs(self.__workingDir+'/software')
 
@@ -74,7 +86,7 @@ class Generator(Process):
             print('Erro na copia dos arquivos quartus')
             exit()
 
-        code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+code+"/", "--app-dir=" + self.__workingDir+'/software/', "--elf-name", "code.elf"])
+        code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+bench+"/", "--app-dir=" + self.__workingDir+'/software/', "--elf-name", "code.elf"])
         if code.returncode != 0:
             print('Erro na copia dos arquivos quartus')
             exit()
@@ -96,10 +108,11 @@ class Generator(Process):
             else:
                 print(str(self.__pid) + " " +self.__current)
                 self.__workingDir = self.__rootDir +'/'+self.__current+'/'
-                # self._setupFolder()
-                # self._populateQsys()
-                # self._compileQuartus()
-                # self._compileSoftware('checksum')
+                self._setupFolder()
+                self._populateQsys()
+                self._compileQuartus()
+                self._compileSoftware('checksum')
+                self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
 
@@ -159,15 +172,18 @@ class TestBench(Process):
 
     def _benchmark(self):
 
-        while True:
-            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 60', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+        retry = 3
 
-            result = []
-            for x in range(8):
+        while True:
+
+            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 5', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+            aux = []
+            for x in range(5):
                 for line in iter(p.stdout.readline, b''):
                     string = line.decode("utf-8")
+                    print(string)
                     try:
-                        result.append(int(string))
+                        aux.append(int(string))
                     except:
                         pass
                     else:
@@ -175,21 +191,70 @@ class TestBench(Process):
 
             # print("Resultado desse Hardware: ", result)
             try:
-                result = reduce(lambda x, y: x + y, result) / len(result)
+                result = reduce(lambda x, y: x + y, aux[2:]) / len(aux[2:])
+
+                print(bcolors.WARNING + " " + self.__current)
+                print(aux)
+                print(bcolors.ENDC)
             except:
-                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
-                subprocess.run(["kill", str(p.pid)])
-                pass
+                if retry > 0:
+                    subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
+                    subprocess.run(["kill", str(p.pid)])
+                    retry -= 1
+                else:
+                    subprocess.run(["kill", str(p.pid)])
+                    self._configureBoard()
+                    self._transferCode()
+                    retry = 3
             else:
                 subprocess.run(["kill", str(p.pid)])
                 return result
+
+    def _getUsageData(self):
+
+        with open(self.__workingDir + "output_files/base.fit.summary", 'r') as f:
+
+            format_string_memory = 'Total block memory bits : {} / {} ( {} % )'
+            format_string_ram = 'Total RAM Blocks : {} / {} ( {} % )'
+            format_string_alm = 'Logic utilization (in ALMs) : {} / {} ( {} % )'
+
+            output = f.read().splitlines()
+
+            result = {}
+
+            for line in output:
+                if 'ALMs' in line:
+                    parsed = parse.parse(format_string_alm, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result['alm'] = used
+
+                if 'block memory bits' in line:
+                    parsed = parse.parse(format_string_memory, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result['memory'] = used
+
+                if 'Total RAM Blocks' in line:
+                    parsed = parse.parse(format_string_ram, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result['ram'] = used
+
+            return result
 
     def run(self):
 
         self.__pid = os.getpid()
 
         while True:
-            # print(self.__RUNNING)
+
             try:
                 self.__current = str(self.__toBenchmark.get_nowait())
             except Exception:
@@ -197,9 +262,28 @@ class TestBench(Process):
             else:
                 print(str(self.__pid) + " " +self.__current)
                 self.__workingDir = self.__rootDir +'/'+self.__current+'/'
+
                 self._configureBoard()
+                print(bcolors.FAIL)
+                print(str(self.__pid) + " " + self.__current + " config")
+                print(bcolors.ENDC)
+
                 self._transferCode()
-                self.__result.put(self._benchmark())
+                print(bcolors.FAIL)
+                print(str(self.__pid) + " " + self.__current + " transf")
+                print(bcolors.ENDC)
+
+                result = self._getUsageData()
+
+                result['id'] = int(self.__current)
+                result['time'] = self._benchmark()
+
+                self.__result.put(result)
+                print(bcolors.FAIL)
+                print(str(self.__pid) + " " + self.__current + " bench")
+                print(bcolors.ENDC)
+
+
 
 if __name__ == '__main__':
 
@@ -210,23 +294,31 @@ if __name__ == '__main__':
     result = Queue()
     prefix = 'q'
 
-    gen = TestBench(target, toBenchmark, prefix, base, 1, result)
-    gen.start()
+    ben1 = TestBench(target, toBenchmark, prefix, base, 1, result)
+    ben2 = TestBench(target, toBenchmark, prefix, base, 2, result)
+
+    ben1.start()
+    ben2.start()
 
     results = []
 
-    for x in range(1, 2):
+    for x in range(1, 33):
         toBenchmark.put(x)
 
 
-    while len(results) < 1:
+    while len(results) < 32:
         try:
             results.append(result.get_nowait())
         except Exception:
             time.sleep(1)
+            print('\n')
 
-    gen.terminate()
-    gen.join()
+            for i in results:
+                print(i)
+
+    ben1.terminate()
+    ben2.terminate()
+
 
     print(results)
 
