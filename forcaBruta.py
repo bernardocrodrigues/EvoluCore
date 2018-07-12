@@ -71,14 +71,31 @@ prefix = 'q'
 start = time.time()
 
 
-params = ['icache_size', 'dcache_size']
-discreteParams = [{'dcache_bursts': ['true', 'false']}, {'dcache_victim_buf_impl': ['reg', 'ram']}, {'icache_burstType': ['Sequential', 'None']}]
+#params = ['icache_size', 'dcache_size']
+params = []
+discreteParams = [
+   # {'dcache_bursts': ['true', 'false']},
+   # {'dcache_victim_buf_impl': ['reg', 'ram']},
+   # {'icache_burstType': ['Sequential', 'None']},
+   # {'setting_support31bitdcachebypass': ['true', 'false']},
+   # {'dividerType': ['no_div', 'srt2']},
+    {'mul_32_impl': ['1', '0', '2', '3']},
+    {'shift_rot_impl': ['1', '0']},
+    {'mul_64_impl': ['1', '0']},
+    #{'setting_bhtPtrSz': ['8', '12', '13']},
+    #{'setting_branchpredictiontype': ['Dynamic', 'Static']}
+
+]
+
+
 
 cores = genCores(params, 64, 2, discreteParams)
 
+
 print(cores)
 
-exit()
+# exit()
+
 
 for core in cores:
     qFac.modifyNios(core)
@@ -122,7 +139,7 @@ bench2.terminate()
 
 for core in cores:
     for x in final:
-        if core['id'] == x['id']:
+        if core['id'] == x['id'] and x['time'] != -1:
             core['time'] = x['time']
             core['alm'] = x['alm']
             core['memory'] = x['memory']

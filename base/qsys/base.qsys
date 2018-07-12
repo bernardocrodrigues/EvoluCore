@@ -115,13 +115,13 @@
    kind="altera_avalon_timer"
    version="18.0"
    enabled="1">
-  <parameter name="alwaysRun" value="false" />
+  <parameter name="alwaysRun" value="true" />
   <parameter name="counterSize" value="32" />
-  <parameter name="fixedPeriod" value="true" />
-  <parameter name="period" value="500000000" />
-  <parameter name="periodUnits" value="CLOCKS" />
+  <parameter name="fixedPeriod" value="false" />
+  <parameter name="period" value="1" />
+  <parameter name="periodUnits" value="USEC" />
   <parameter name="resetOutput" value="false" />
-  <parameter name="snapshot" value="false" />
+  <parameter name="snapshot" value="true" />
   <parameter name="systemFrequency" value="50000000" />
   <parameter name="timeoutPulseOutput" value="false" />
   <parameter name="watchdogPulse" value="2" />
@@ -198,12 +198,12 @@
   <parameter name="data_master_high_performance_paddr_size" value="0" />
   <parameter name="data_master_paddr_base" value="0" />
   <parameter name="data_master_paddr_size" value="0" />
-  <parameter name="dcache_bursts" value="true" />
+  <parameter name="dcache_bursts" value="false" />
   <parameter name="dcache_numTCDM" value="0" />
   <parameter name="dcache_ramBlockType" value="Automatic" />
-  <parameter name="dcache_size" value="512" />
+  <parameter name="dcache_size" value="0" />
   <parameter name="dcache_tagramBlockType" value="Automatic" />
-  <parameter name="dcache_victim_buf_impl" value="reg" />
+  <parameter name="dcache_victim_buf_impl" value="ram" />
   <parameter name="debug_OCIOnchipTrace" value="_128" />
   <parameter name="debug_assignJtagInstanceID" value="false" />
   <parameter name="debug_datatrigger" value="0" />
@@ -225,10 +225,10 @@
   <parameter name="fa_cache_linesize" value="0" />
   <parameter name="flash_instruction_master_paddr_base" value="0" />
   <parameter name="flash_instruction_master_paddr_size" value="0" />
-  <parameter name="icache_burstType" value="Sequential" />
+  <parameter name="icache_burstType" value="None" />
   <parameter name="icache_numTCIM" value="0" />
   <parameter name="icache_ramBlockType" value="Automatic" />
-  <parameter name="icache_size" value="512" />
+  <parameter name="icache_size" value="0" />
   <parameter name="icache_tagramBlockType" value="Automatic" />
   <parameter name="impl" value="Fast" />
   <parameter name="instAddrWidth" value="19" />
@@ -260,8 +260,8 @@
   <parameter name="mpu_numOfInstRegion" value="8" />
   <parameter name="mpu_useLimit" value="false" />
   <parameter name="mpx_enabled" value="false" />
-  <parameter name="mul_32_impl" value="0" />
-  <parameter name="mul_64_impl" value="0" />
+  <parameter name="mul_32_impl" value="2" />
+  <parameter name="mul_64_impl" value="1" />
   <parameter name="mul_shift_choice" value="1" />
   <parameter name="ocimem_ramBlockType" value="Automatic" />
   <parameter name="ocimem_ramInit" value="false" />
@@ -282,9 +282,9 @@
   <parameter name="setting_asic_synopsys_translate_on_off" value="false" />
   <parameter name="setting_asic_third_party_synthesis" value="false" />
   <parameter name="setting_avalonDebugPortPresent" value="false" />
-  <parameter name="setting_bhtPtrSz" value="8" />
+  <parameter name="setting_bhtPtrSz" value="13" />
   <parameter name="setting_bigEndian" value="false" />
-  <parameter name="setting_branchpredictiontype" value="Dynamic" />
+  <parameter name="setting_branchpredictiontype" value="Static" />
   <parameter name="setting_breakslaveoveride" value="false" />
   <parameter name="setting_clearXBitsLDNonBypass" value="true" />
   <parameter name="setting_dc_ecc_present" value="true" />

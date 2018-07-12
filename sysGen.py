@@ -46,7 +46,7 @@ class Generator(Process):
         code = subprocess.run(["qsys-generate --synthesis=VHDL "+ self.__rootDir + '/qsys/' + self.__prefix + self.__current + ".qsys --output-directory=" + self.__rootDir + '/' + self.__current], shell=True)
         if code.returncode != 0:
             print('Erro na compilação do Qsys')
-            exit()
+            raise AssertionError
 
     def _fixTopDesignName(self):
 
@@ -109,10 +109,14 @@ class Generator(Process):
                 print(str(self.__pid) + " " +self.__current)
                 self.__workingDir = self.__rootDir +'/'+self.__current+'/'
                 self._setupFolder()
-                self._populateQsys()
-                self._compileQuartus()
-                self._compileSoftware('checksum')
-                self.__toBenchmark.put(int(self.__current))
+                try:
+                    self._populateQsys()
+                except AssertionError:
+                    self.__toBenchmark.put(int(self.__current))
+                else:
+                    self._compileQuartus()
+                    self._compileSoftware('checksum')
+                    self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
 
@@ -139,6 +143,7 @@ class TestBench(Process):
 
             for line in iter(p.stdout.readline, b''):
                 string = line.decode("utf-8")
+                # print(string)
                 if "Configuration succeeded" in string:
                     success = True
                     subprocess.run(["kill", str(p.pid)])
@@ -147,6 +152,8 @@ class TestBench(Process):
                     subprocess.run(["kill", str(p.pid)])
                     subprocess.run(["killall", "jtagd"])
                     break
+                if 'does not exist or can\'t be read' in string:
+                    raise FileNotFoundError
 
     def _transferCode(self):
 
@@ -262,26 +269,35 @@ class TestBench(Process):
             else:
                 print(str(self.__pid) + " " +self.__current)
                 self.__workingDir = self.__rootDir +'/'+self.__current+'/'
+                try:
+                    self._configureBoard()
+                except FileNotFoundError:
+                    result = {}
+                    result['id'] = int(self.__current)
+                    result['time'] = -1
+                    self.__result.put(result)
+                    print(bcolors.FAIL)
+                    print(str(self.__pid) + " " + self.__current + " INVALIDO")
+                    print(bcolors.ENDC)
+                else:
+                    print(bcolors.FAIL)
+                    print(str(self.__pid) + " " + self.__current + " config")
+                    print(bcolors.ENDC)
 
-                self._configureBoard()
-                print(bcolors.FAIL)
-                print(str(self.__pid) + " " + self.__current + " config")
-                print(bcolors.ENDC)
+                    self._transferCode()
+                    print(bcolors.FAIL)
+                    print(str(self.__pid) + " " + self.__current + " transf")
+                    print(bcolors.ENDC)
 
-                self._transferCode()
-                print(bcolors.FAIL)
-                print(str(self.__pid) + " " + self.__current + " transf")
-                print(bcolors.ENDC)
+                    result = self._getUsageData()
 
-                result = self._getUsageData()
+                    result['id'] = int(self.__current)
+                    result['time'] = self._benchmark()
 
-                result['id'] = int(self.__current)
-                result['time'] = self._benchmark()
-
-                self.__result.put(result)
-                print(bcolors.FAIL)
-                print(str(self.__pid) + " " + self.__current + " bench")
-                print(bcolors.ENDC)
+                    self.__result.put(result)
+                    print(bcolors.FAIL)
+                    print(str(self.__pid) + " " + self.__current + " bench")
+                    print(bcolors.ENDC)
 
 
 
