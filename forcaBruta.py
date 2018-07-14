@@ -78,13 +78,24 @@ discreteParams = [
    # {'dcache_victim_buf_impl': ['reg', 'ram']},
    # {'icache_burstType': ['Sequential', 'None']},
    # {'setting_support31bitdcachebypass': ['true', 'false']},
-   # {'dividerType': ['no_div', 'srt2']},
-    {'mul_32_impl': ['1', '0', '2', '3']},
-    {'shift_rot_impl': ['1', '0']},
-    {'mul_64_impl': ['1', '0']},
-    #{'setting_bhtPtrSz': ['8', '12', '13']},
-    #{'setting_branchpredictiontype': ['Dynamic', 'Static']}
-
+   {'dividerType': ['no_div', 'srt2']},
+    {'mul_32_impl': ['0', '1', '2', '3']},
+    # {'shift_rot_impl': ['1', '0']},
+    # {'mul_64_impl': ['1', '0']},
+    # {'setting_bhtPtrSz': ['8', '12', '13']},
+    # {'setting_branchpredictiontype': ['Dynamic', 'Static']}
+    {'icache_size': [
+                     '0',
+                     # '128',
+                     '256',
+                     # '512'
+    ]},
+    {'dcache_size': [
+        '0',
+    #     # '128',
+        '256',
+    #     # '512'
+    ]}
 ]
 
 
@@ -94,7 +105,7 @@ cores = genCores(params, 64, 2, discreteParams)
 
 print(cores)
 
-# exit()
+
 
 
 for core in cores:
@@ -114,6 +125,15 @@ gen1.start()
 gen2.start()
 gen3.start()
 gen4.start()
+
+
+# gen1.join()
+# gen2.join()
+# gen3.join()
+# gen4.join()
+#
+# exit()
+
 
 
 bench1 = sysGen.TestBench(target, toBenchmark, prefix, base, 1, result)
@@ -139,11 +159,12 @@ bench2.terminate()
 
 for core in cores:
     for x in final:
-        if core['id'] == x['id'] and x['time'] != -1:
-            core['time'] = x['time']
-            core['alm'] = x['alm']
-            core['memory'] = x['memory']
-            core['ram'] = x['ram']
+        if core['id'] == x['id']:
+            core.update(x)
+            # core['time'] = x['time']
+            # core['alm'] = x['alm']
+            # core['memory'] = x['memory']
+            # core['ram'] = x['ram']
 
 
 saveFile('/home/bcrodrigues/resultado.txt', 'json', cores)

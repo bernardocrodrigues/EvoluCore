@@ -42,7 +42,6 @@ class Generator(Process):
 
     def _populateQsys(self):
 
-        # code = subprocess.run(["qsys-generate", "--synthesis=VHDL", self.__rootDir + '/qsys/'+self.__prefix+self.__current+'.qsys', "--output-directory="+self.__rootDir +'/'+self.__current])
         code = subprocess.run(["qsys-generate --synthesis=VHDL "+ self.__rootDir + '/qsys/' + self.__prefix + self.__current + ".qsys --output-directory=" + self.__rootDir + '/' + self.__current], shell=True)
         if code.returncode != 0:
             print('Erro na compilação do Qsys')
@@ -77,7 +76,7 @@ class Generator(Process):
             print('Erro na compilação do quartus')
             exit()
 
-    def _compileSoftware(self, bench):
+    def _compileSoftware(self, benchmarks):
 
         os.makedirs(self.__workingDir+'/software')
 
@@ -86,15 +85,17 @@ class Generator(Process):
             print('Erro na copia dos arquivos quartus')
             exit()
 
-        code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+bench+"/", "--app-dir=" + self.__workingDir+'/software/', "--elf-name", "code.elf"])
-        if code.returncode != 0:
-            print('Erro na copia dos arquivos quartus')
-            exit()
+        for benchmark in benchmarks:
 
-        code = subprocess.run(["make", "-C", self.__workingDir+'/software/'])
-        if code.returncode != 0:
-            print('Erro na copia dos arquivos quartus')
-            exit()
+            code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+benchmark+"/", "--app-dir=" + self.__workingDir+'/software/'+benchmark+"/", "--elf-name", "code.elf"])
+            if code.returncode != 0:
+                print('Erro na copia dos arquivos quartus')
+                exit()
+
+            code = subprocess.run(["make", "-C", self.__workingDir+'/software/'+benchmark+'/'])
+            if code.returncode != 0:
+                print('Erro na copia dos arquivos quartus')
+                exit()
 
     def run(self):
 
@@ -115,7 +116,7 @@ class Generator(Process):
                     self.__toBenchmark.put(int(self.__current))
                 else:
                     self._compileQuartus()
-                    self._compileSoftware('checksum')
+                    self._compileSoftware(['fractal', 'checksum'])
                     self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
@@ -138,7 +139,7 @@ class TestBench(Process):
 
         success = False
         while not success:
-            # p = subprocess.Popen(["quartus_pgm","-c", str(board), "-z", "--mode=JTAG", "--operation=\"p;"+self.__workingDir +"\""], stdout=subprocess.PIPE, preexec_fn=os.setsid)
+
             p = subprocess.Popen("quartus_pgm -c "+str(self.__cable) + " -z --mode=JTAG --operation=\"p;" + self.__workingDir +"output_files/base_time_limited.sof@2\"",stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
 
             for line in iter(p.stdout.readline, b''):
@@ -155,7 +156,7 @@ class TestBench(Process):
                 if 'does not exist or can\'t be read' in string:
                     raise FileNotFoundError
 
-    def _transferCode(self):
+    def _transferCode(self, benchmark):
 
         confiredProperly = False
         while not confiredProperly:
@@ -163,7 +164,7 @@ class TestBench(Process):
             retry = -1
 
             while returnCode != 0:
-                code = subprocess.run(["nios2-download", "-c", str(self.__cable), "-r", "-g", self.__workingDir + "/software/code.elf"])
+                code = subprocess.run(["nios2-download", "-c", str(self.__cable), "-r", "-g", self.__workingDir + "/software/"+benchmark+"/code.elf"])
                 subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
                 returnCode = code.returncode
                 retry += 1
@@ -172,18 +173,18 @@ class TestBench(Process):
 
             if returnCode != 0:
                 subprocess.run(["killall", "jtagd"])
-                self._configureBoard(1)
+                self._configureBoard()
             else:
                 subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
                 confiredProperly = True
 
-    def _benchmark(self):
+    def _benchmark(self, benchmark):
 
         retry = 3
 
         while True:
 
-            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 5', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 15', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
             aux = []
             for x in range(5):
                 for line in iter(p.stdout.readline, b''):
@@ -211,11 +212,11 @@ class TestBench(Process):
                 else:
                     subprocess.run(["kill", str(p.pid)])
                     self._configureBoard()
-                    self._transferCode()
+                    self._transferCode(benchmark)
                     retry = 3
             else:
                 subprocess.run(["kill", str(p.pid)])
-                return result
+                return result, aux
 
     def _getUsageData(self):
 
@@ -284,15 +285,25 @@ class TestBench(Process):
                     print(str(self.__pid) + " " + self.__current + " config")
                     print(bcolors.ENDC)
 
-                    self._transferCode()
-                    print(bcolors.FAIL)
-                    print(str(self.__pid) + " " + self.__current + " transf")
-                    print(bcolors.ENDC)
-
                     result = self._getUsageData()
-
                     result['id'] = int(self.__current)
-                    result['time'] = self._benchmark()
+
+                    benchmarks = ['checksum', 'fractal']
+
+                    for benchmark in benchmarks:
+
+                        aux= {}
+
+                        self._transferCode(benchmark)
+                        print(bcolors.FAIL)
+                        print(str(self.__pid) + " " + self.__current + " transf")
+                        print(bcolors.ENDC)
+
+                        media, times = self._benchmark(benchmark)
+                        aux['time'] = media
+                        aux['times'] = times
+
+                        result[benchmark] = aux
 
                     self.__result.put(result)
                     print(bcolors.FAIL)
@@ -318,7 +329,7 @@ if __name__ == '__main__':
 
     results = []
 
-    for x in range(1, 33):
+    for x in range(1, 3):
         toBenchmark.put(x)
 
 
@@ -335,10 +346,7 @@ if __name__ == '__main__':
     ben1.terminate()
     ben2.terminate()
 
-
     print(results)
-
-
 
 
 
