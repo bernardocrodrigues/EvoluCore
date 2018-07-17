@@ -116,7 +116,7 @@ class Generator(Process):
                     self.__toBenchmark.put(int(self.__current))
                 else:
                     self._compileQuartus()
-                    self._compileSoftware(['fractal', 'checksum'])
+                    self._compileSoftware(['pi'])
                     self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
@@ -288,7 +288,7 @@ class TestBench(Process):
                     result = self._getUsageData()
                     result['id'] = int(self.__current)
 
-                    benchmarks = ['checksum', 'fractal']
+                    benchmarks = ['pi']
 
                     for benchmark in benchmarks:
 
@@ -329,7 +329,7 @@ if __name__ == '__main__':
 
     results = []
 
-    for x in range(1, 3):
+    for x in range(1, 2):
         toBenchmark.put(x)
 
 

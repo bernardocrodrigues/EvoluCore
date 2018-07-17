@@ -78,8 +78,8 @@ discreteParams = [
    # {'dcache_victim_buf_impl': ['reg', 'ram']},
    # {'icache_burstType': ['Sequential', 'None']},
    # {'setting_support31bitdcachebypass': ['true', 'false']},
-   {'dividerType': ['no_div', 'srt2']},
-    {'mul_32_impl': ['0', '1', '2', '3']},
+   # {'dividerType': ['no_div', 'srt2']},
+   #  {'mul_32_impl': ['0', '1', '2', '3']},
     # {'shift_rot_impl': ['1', '0']},
     # {'mul_64_impl': ['1', '0']},
     # {'setting_bhtPtrSz': ['8', '12', '13']},
@@ -87,15 +87,15 @@ discreteParams = [
     {'icache_size': [
                      '0',
                      # '128',
-                     '256',
+                     # '256',
                      # '512'
     ]},
-    {'dcache_size': [
-        '0',
+    # {'dcache_size': [
+        # '0',
     #     # '128',
-        '256',
+    #     '256',
     #     # '512'
-    ]}
+    # ]}
 ]
 
 
@@ -104,7 +104,6 @@ cores = genCores(params, 64, 2, discreteParams)
 
 
 print(cores)
-
 
 
 
