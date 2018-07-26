@@ -116,7 +116,7 @@ class Generator(Process):
                     self.__toBenchmark.put(int(self.__current))
                 else:
                     self._compileQuartus()
-                    self._compileSoftware(['pi'])
+                    self._compileSoftware(['dotprod'])
                     self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
@@ -288,7 +288,7 @@ class TestBench(Process):
                     result = self._getUsageData()
                     result['id'] = int(self.__current)
 
-                    benchmarks = ['pi']
+                    benchmarks = ['dotprod']
 
                     for benchmark in benchmarks:
 
