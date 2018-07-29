@@ -3,11 +3,13 @@ from multiprocessing import Process, Queue
 import time
 from functools import reduce
 import parse
+import xmlParse
+from millenium import db
+import traceback
 
 
+class log:
 
-
-class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKGREEN = '\033[92m'
@@ -16,6 +18,44 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+    @classmethod
+    def begin_task(cls, pid, core, message):
+        print(cls.HEADER +str(pid)+ cls.ENDC + " | " + cls.BOLD +str(core)+ cls.ENDC + " | " + str(message) +" ...")
+
+    @classmethod
+    def end_task(cls, pid, core, message):
+        print(cls.HEADER +str(pid)+ cls.ENDC + " | " + cls.BOLD +str(core)+ cls.ENDC + " | " + str(message) +cls.BOLD + " OK!" + cls.ENDC)
+
+    @classmethod
+    def exit_message(cls, pid):
+        print(cls.HEADER + str(pid) + cls.ENDC + " | - | "+ cls.OKGREEN + "DONE!")
+
+    @classmethod
+    def error_message(cls, pid, core, message):
+        print(cls.HEADER + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + cls.FAIL + str(message))
+
+    @classmethod
+    def success(cls, pid, core):
+        print(cls.HEADER + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + cls.OKGREEN + 'SUCCESS!' + cls.ENDC)
+
+
+
+    @classmethod
+    def bench_begin_task(cls, pid, core, message):
+        print(cls.OKBLUE +str(pid)+ cls.ENDC + " | " + cls.BOLD +str(core)+ cls.ENDC + " | " + str(message) +" ...")
+
+    @classmethod
+    def bench_end_task(cls, pid, core, message):
+        print(cls.OKBLUE + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + str(
+            message) + cls.BOLD + " OK!" + cls.ENDC)
+
+    @classmethod
+    def bench_error_message(cls, pid, core, message):
+        print(cls.HEADER + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + cls.FAIL + str(
+            message))
+
+
 
 
 class Generator(Process):
@@ -122,6 +162,133 @@ class Generator(Process):
                     self._compileSoftware(['sobel'])
                     self.__toBenchmark.put(int(self.__current))
 
+class Generator_on_db(Process):
+
+    def __init__(self, rootDir, prefix, referenceDir, toBenchmark):
+
+        Process.__init__(self)
+        self.__rootDir = rootDir
+        self.__workingDir = rootDir
+        self.__current = None
+        self.__pid = None
+        self.__prefix = prefix
+        self.__referenceDir = referenceDir
+        self.__toBenchmark = toBenchmark
+
+        baseFile = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/baseOriginal.qsys"
+        targetDir = "/home/bcrodrigues/tcc/qsys/"
+
+        self.__qFac = xmlParse.qsysFactory(baseFile, targetDir)
+
+        self.__db = db()
+
+    def _setupFolder(self):
+        try:
+            if os.path.isdir(self.__workingDir):
+                shutil.rmtree(self.__workingDir)
+                os.makedirs(self.__workingDir)
+            else:
+                os.makedirs(self.__workingDir)
+        except OSError:
+            print('Erro no setup das pastas')
+            exit(1)
+
+    def _populateQsys(self):
+
+        code = subprocess.run(["qsys-generate", "--synthesis=VHDL", self.__rootDir + '/qsys/' + self.__prefix + str(
+            self.__current['id_core']) + ".qsys", "--output-directory=" + self.__rootDir + '/' + str(
+            self.__current['id_core'])], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+
+        if code.returncode != 0:
+            raise AssertionError
+
+    def _fixTopDesignName(self):
+
+        with open(self.__workingDir + 'base.qsf', 'r') as f:
+            lines = f.readlines()
+
+        for x, line in enumerate(lines):
+            if 'TOP_LEVEL_ENTITY' in line:
+                lines[x] = 'set_global_assignment -name TOP_LEVEL_ENTITY '+self.__prefix+str(self.__current['id_core'])+'\n'
+            if 'QIP_FILE' in line:
+                lines[x] = 'set_global_assignment -name QIP_FILE synthesis/'+self.__prefix+str(self.__current['id_core'])+'.qip\n'
+
+        with open(self.__workingDir + 'base.qsf', 'w') as f:
+            for line in lines:
+                f.write(line)
+
+    def _compileQuartus(self):
+
+        code = subprocess.run(["cp", "-a", self.__referenceDir+"quartus/.", self.__workingDir])
+        if code.returncode != 0:
+            raise Exception('Erro na copia dos arquivos quartus')
+
+
+        self._fixTopDesignName()
+
+        code = subprocess.run(["quartus_sh", "--flow", "compile", self.__workingDir+"base.qpf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        if code.returncode != 0:
+            raise Exception('Erro na compilação do quartus')
+
+    def _compileSoftware(self, benchmarks):
+
+        os.makedirs(self.__workingDir+'/software')
+
+        code = subprocess.run(["nios2-bsp", "hal", self.__workingDir+'/software/bsp', self.__rootDir + '/qsys/' + self.__prefix + str(self.__current['id_core'])+'.sopcinfo', "--script=" + self.__referenceDir+ "/bsp/parameters.tcl"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        if code.returncode != 0:
+            raise Exception('Erro no BSP')
+
+
+        for benchmark in benchmarks:
+
+            code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+benchmark+"/", "--app-dir=" + self.__workingDir+'/software/'+benchmark+"/", "--elf-name", "code.elf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            if code.returncode != 0:
+                raise Exception('Erro no makefile')
+
+
+            code = subprocess.run(["make", "-C", self.__workingDir+'/software/'+benchmark+'/'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            if code.returncode != 0:
+                raise Exception('Erro no make')
+
+    def run(self):
+
+        self.__pid = os.getpid()
+
+        while True:
+            self.__current = self.__db.get_free_core()
+            if self.__current == None:
+                log.exit_message(self.__pid)
+                exit(0)
+            else:
+                try:
+
+                    log.begin_task(self.__pid, str(self.__current['id_core']), "Got core " + str(self.__current['id_core']))
+                    self.__qFac.modifyNios(self.__current)
+                    self.__qFac.writeCurrentQsys('q' + str(self.__current['id_core']) + '.qsys')
+                    self.__qFac.resetCurrentQsys()
+                    self.__workingDir = self.__rootDir + '/' + str(self.__current['id_core']) + '/'
+                    self._setupFolder()
+                    log.end_task(self.__pid, str(self.__current['id_core']), "QSYS files and folders")
+
+                    log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling QSYS")
+                    self._populateQsys()
+                    log.end_task(self.__pid, str(self.__current['id_core']), "Compiling QSYS")
+
+                    log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Quartus Project")
+                    self._compileQuartus()
+                    log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Quartus Project")
+
+                    log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
+                    self._compileSoftware(['sobel', 'quick_sort'])
+                    log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
+
+                    self.__toBenchmark.put(int(self.__current['id_core']))
+                    log.success(self.__pid, str(self.__current['id_core']))
+
+                except Exception:
+                    log.error_message(self.__pid, str(self.__current['id_core']), "ERROR! \n" + traceback.format_exc())
+
+
 class TestBench(Process):
 
     def __init__(self, rootDir, toBenchmark, prefix, referenceDir, cable, result):
@@ -143,19 +310,21 @@ class TestBench(Process):
         success = False
         while not success:
 
-            p = subprocess.Popen("quartus_pgm -c "+str(self.__cable) + " -z --mode=JTAG --operation=\"p;" + self.__workingDir +"output_files/base_time_limited.sof@2\"",stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+            p = subprocess.Popen("quartus_pgm -c "+str(self.__cable) + " -z --mode=JTAG --operation=\"p;" + self.__workingDir +"output_files/base_time_limited.sof@2\"",stdout=subprocess.PIPE, shell=True)
 
             for line in iter(p.stdout.readline, b''):
                 string = line.decode("utf-8")
-                # print(string)
+
                 if "Configuration succeeded" in string:
                     success = True
                     subprocess.run(["kill", str(p.pid)])
                     break
+
                 if "Operation failed" in string:
                     subprocess.run(["kill", str(p.pid)])
                     subprocess.run(["killall", "jtagd"])
                     break
+
                 if 'does not exist or can\'t be read' in string:
                     raise FileNotFoundError
 
@@ -167,8 +336,8 @@ class TestBench(Process):
             retry = -1
 
             while returnCode != 0:
-                code = subprocess.run(["nios2-download", "-c", str(self.__cable), "-r", "-g", self.__workingDir + "/software/"+benchmark+"/code.elf"])
-                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
+                code = subprocess.run(["nios2-download", "-c", str(self.__cable), "-r", "-g", self.__workingDir + "/software/"+benchmark+"/code.elf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                 returnCode = code.returncode
                 retry += 1
                 if retry > 5:
@@ -178,7 +347,7 @@ class TestBench(Process):
                 subprocess.run(["killall", "jtagd"])
                 self._configureBoard()
             else:
-                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
+                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                 confiredProperly = True
 
     def _benchmark(self, benchmark):
@@ -192,21 +361,14 @@ class TestBench(Process):
             for x in range(5):
                 for line in iter(p.stdout.readline, b''):
                     string = line.decode("utf-8")
-                    print(string)
                     try:
                         aux.append(int(string))
                     except:
                         pass
                     else:
                         break
-
-            # print("Resultado desse Hardware: ", result)
             try:
                 result = reduce(lambda x, y: x + y, aux[2:]) / len(aux[2:])
-
-                print(bcolors.WARNING + " " + self.__current)
-                print(aux)
-                print(bcolors.ENDC)
             except:
                 if retry > 0:
                     subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
@@ -263,72 +425,131 @@ class TestBench(Process):
     def run(self):
 
         self.__pid = os.getpid()
-
         while True:
-
             try:
                 self.__current = str(self.__toBenchmark.get_nowait())
             except Exception:
                 time.sleep(1)
             else:
-                print(str(self.__pid) + " " +self.__current)
-                self.__workingDir = self.__rootDir +'/'+self.__current+'/'
-                try:
-                    self._configureBoard()
-                except FileNotFoundError:
-                    result = {}
-                    result['id'] = int(self.__current)
-                    result['time'] = -1
-                    self.__result.put(result)
-                    print(bcolors.FAIL)
-                    print(str(self.__pid) + " " + self.__current + " INVALIDO")
-                    print(bcolors.ENDC)
-                else:
-                    print(bcolors.FAIL)
-                    print(str(self.__pid) + " " + self.__current + " config")
-                    print(bcolors.ENDC)
 
+                log.bench_begin_task(self.__pid, self.__current, "Got core " + str(self.__current))
+
+                self.__workingDir = self.__rootDir + '/' + self.__current + '/'
+                try:
+                    log.bench_begin_task(self.__pid, self.__current, "Configuring Board")
+                    self._configureBoard()
+                    log.bench_end_task(self.__pid, self.__current, "Configuring Board")
+                except FileNotFoundError:
+                    log.error_message(self.__pid, str(self.__current), "ERROR! Invalid Core")
+                    #todo atualizar banco
+
+                except Exception:
+                    log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
+
+                else:
+
+                    log.bench_begin_task(self.__pid, self.__current, "Fetching FPGA usage data")
                     result = self._getUsageData()
                     result['id'] = int(self.__current)
+                    log.bench_end_task(self.__pid, self.__current, "Fetching FPGA usage data")
 
-                    benchmarks = ['sobel']
-
-                    for benchmark in benchmarks:
+                    log.bench_begin_task(self.__pid, self.__current, "Benchmarking")
+                    for benchmark in ['quick_sort', 'sobel']:
 
                         aux= {}
 
+                        log.bench_begin_task(self.__pid, self.__current, "Transfering "+ benchmark)
                         self._transferCode(benchmark)
-                        print(bcolors.FAIL)
-                        print(str(self.__pid) + " " + self.__current + " transf")
-                        print(bcolors.ENDC)
+                        log.bench_end_task(self.__pid, self.__current, "Transfering "+ benchmark)
 
+                        log.bench_begin_task(self.__pid, self.__current, "Getting results from " + benchmark)
                         media, times = self._benchmark(benchmark)
+                        log.bench_end_task(self.__pid, self.__current, "Getting results from " + benchmark)
+
                         aux['time'] = media
                         aux['times'] = times
 
                         result[benchmark] = aux
 
-                    self.__result.put(result)
-                    print(bcolors.FAIL)
-                    print(str(self.__pid) + " " + self.__current + " bench")
-                    print(bcolors.ENDC)
+
+
+                    log.bench_end_task(self.__pid, self.__current, "Benchmarking")
+                    print(result)
+
+
+
+
+
+                # self.__workingDir = self.__rootDir +'/'+self.__current+'/'
+                # try:
+                #     self._configureBoard()
+                # except FileNotFoundError:
+                #     result = {}
+                #     result['id'] = int(self.__current)
+                #     result['time'] = -1
+                #     self.__result.put(result)
+                #     print(bcolors.FAIL)
+                #     print(str(self.__pid) + " " + self.__current + " INVALIDO")
+                #     print(bcolors.ENDC)
+                # else:
+                #     print(bcolors.FAIL)
+                #     print(str(self.__pid) + " " + self.__current + " config")
+                #     print(bcolors.ENDC)
+                #
+                #     result = self._getUsageData()
+                #     result['id'] = int(self.__current)
+                #
+                #     benchmarks = ['sobel']
+                #
+                #     for benchmark in benchmarks:
+                #
+                #
+                #
+                #     self.__result.put(result)
+                #     print(bcolors.FAIL)
+                #     print(str(self.__pid) + " " + self.__current + " bench")
+                #     print(bcolors.ENDC)
+
 
 
 
 if __name__ == '__main__':
 
+
     target = "/home/bcrodrigues/tcc/"
     base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
-    toCompile = Queue()
     toBenchmark = Queue()
     result = Queue()
     prefix = 'q'
 
+    # db_ = db()
+    # db_.generate_cores(1)
+    #
+    # gen1 = Generator_on_db(target, prefix, base, toBenchmark)
+    # gen2 = Generator_on_db(target, prefix, base, toBenchmark)
+    # gen3 = Generator_on_db(target, prefix, base, toBenchmark)
+    # gen4 = Generator_on_db(target, prefix, base, toBenchmark)
+    #
+    # gen1.start()
+    # gen2.start()
+    # gen3.start()
+    # gen4.start()
+    #
+    # gen1.join()
+    # gen2.join()
+    # gen3.join()
+    # gen4.join()
+
+
+
+
+    #MAIN 2
+
     ben1 = TestBench(target, toBenchmark, prefix, base, 1, result)
-    ben2 = TestBench(target, toBenchmark, prefix, base, 2, result)
+    # ben2 = TestBench(target, toBenchmark, prefix, base, 2, result)
 
     ben1.start()
-    ben2.start()
+    # ben2.start()
 
     results = []
 
@@ -336,26 +557,22 @@ if __name__ == '__main__':
         toBenchmark.put(x)
 
 
-    while len(results) < 32:
+    while len(results) < 1:
         try:
             results.append(result.get_nowait())
         except Exception:
             time.sleep(1)
-            print('\n')
-
-            for i in results:
-                print(i)
+            # print('\n')
+            # for i in results:
+            #     print(i)
 
     ben1.terminate()
-    ben2.terminate()
+    # ben2.terminate()
 
     print(results)
 
 
-
-
-
-
+    #MAIN 1
     # for x in range(1, 2):
     #     toCompile.put(x)
     #

@@ -136,9 +136,6 @@ discreteParams = [
 
 cores = genCores(params, 64, 2, discreteParams)
 
-for core in cores:
-    insert_core(core)
-
 
 exit()
 
