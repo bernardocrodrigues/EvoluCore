@@ -6,6 +6,9 @@ from functools import reduce
 import json
 import pickle
 
+import sqlite3
+conn = sqlite3.connect('millenium.db')
+import random
 
 class bcolors:
     HEADER = '\033[95m'
@@ -18,6 +21,36 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
+
+def insert_core(core:dict):
+    cur = conn.cursor()
+    cur.execute("insert into core("
+                "dcache_size, "
+                "dcache_bursts, "
+                "dcache_victim_buf_impl, "
+                "icache_size, "
+                "icache_burstType, "
+                "setting_support31bitdcachebypass, "
+                "dividerType, "
+                "mul_32_impl, "
+                "shift_rot_impl,"
+                "mul_64_impl, "
+                "setting_bhtPtrSz, "
+                "setting_branchpredictiontype) "
+                "values (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (core['dcache_size'],
+                 core['dcache_bursts'],
+                 core['dcache_victim_buf_impl'],
+                 core['icache_size'],
+                 core['icache_burstType'],
+                 core['setting_support31bitdcachebypass'],
+                 core['dividerType'],
+                 core['mul_32_impl'],
+                 core['shift_rot_impl'],
+                 core['mul_64_impl'],
+                 core['setting_bhtPtrSz'],
+                 core['setting_branchpredictiontype']))
+    conn.commit()
 
 def genCores(analogParams, step, iterations, discreteParams):
 
@@ -74,37 +107,40 @@ start = time.time()
 #params = ['icache_size', 'dcache_size']
 params = []
 discreteParams = [
-   # {'dcache_bursts': ['true', 'false']},
-   # {'dcache_victim_buf_impl': ['reg', 'ram']},
-   # {'icache_burstType': ['Sequential', 'None']},
-   # {'setting_support31bitdcachebypass': ['true', 'false']},
-   # {'dividerType': ['no_div', 'srt2']},
-   #  {'mul_32_impl': ['0', '1', '2', '3']},
-    # {'shift_rot_impl': ['1', '0']},
-    # {'mul_64_impl': ['1', '0']},
-    # {'setting_bhtPtrSz': ['8', '12', '13']},
-    # {'setting_branchpredictiontype': ['Dynamic', 'Static']}
+   {'dcache_bursts': ['true', 'false']},
+   {'dcache_victim_buf_impl': ['reg', 'ram']},
+   {'icache_burstType': ['Sequential', 'None']},
+   {'setting_support31bitdcachebypass': ['true', 'false']},
+   {'dividerType': ['no_div', 'srt2']},
+    {'mul_32_impl': ['0', '1', '2', '3']},
+    {'shift_rot_impl': ['1', '0']},
+    {'mul_64_impl': ['1', '0']},
+    {'setting_bhtPtrSz': ['8', '12', '13']},
+    {'setting_branchpredictiontype': ['Dynamic', 'Static']},
     {'icache_size': [
                      '0',
-                     # '128',
-                     # '256',
-                     # '512'
+                     '1024',
+                     '2048',
+                     '4096',
+                     '8192'
     ]},
-    # {'dcache_size': [
-        # '0',
-    #     # '128',
-    #     '256',
-    #     # '512'
-    # ]}
+    {'dcache_size': [
+    '0',
+    '1024',
+    '2048',
+    '4096',
+    '8192'
+     ]}
 ]
-
 
 
 cores = genCores(params, 64, 2, discreteParams)
 
+for core in cores:
+    insert_core(core)
 
-print(cores)
 
+exit()
 
 
 for core in cores:

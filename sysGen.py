@@ -4,6 +4,9 @@ import time
 from functools import reduce
 import parse
 
+
+
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -116,7 +119,7 @@ class Generator(Process):
                     self.__toBenchmark.put(int(self.__current))
                 else:
                     self._compileQuartus()
-                    self._compileSoftware(['dotprod'])
+                    self._compileSoftware(['sobel'])
                     self.__toBenchmark.put(int(self.__current))
 
 class TestBench(Process):
@@ -288,7 +291,7 @@ class TestBench(Process):
                     result = self._getUsageData()
                     result['id'] = int(self.__current)
 
-                    benchmarks = ['dotprod']
+                    benchmarks = ['sobel']
 
                     for benchmark in benchmarks:
 
