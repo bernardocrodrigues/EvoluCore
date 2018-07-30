@@ -279,7 +279,7 @@ class Generator_on_db(Process):
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Quartus Project")
 
                     log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
-                    self._compileSoftware(['sobel', 'quick_sort'])
+                    self._compileSoftware(['sobel', 'quick_sort', 'adpcm', 'dotprod', 'vecsum'])
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
 
                     self.__toBenchmark.put(int(self.__current['id_core']))
@@ -287,7 +287,6 @@ class Generator_on_db(Process):
 
                 except Exception:
                     log.error_message(self.__pid, str(self.__current['id_core']), "ERROR! \n" + traceback.format_exc())
-
 
 class TestBench(Process):
 
@@ -358,7 +357,7 @@ class TestBench(Process):
 
             p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 15', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
             aux = []
-            for x in range(5):
+            for x in range(10):
                 for line in iter(p.stdout.readline, b''):
                     string = line.decode("utf-8")
                     try:
@@ -368,10 +367,10 @@ class TestBench(Process):
                     else:
                         break
             try:
-                result = reduce(lambda x, y: x + y, aux[2:]) / len(aux[2:])
+                result = reduce(lambda x, y: x + y, aux[4:]) / len(aux[4:])
             except:
                 if retry > 0:
-                    subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"])
+                    subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                     subprocess.run(["kill", str(p.pid)])
                     retry -= 1
                 else:
@@ -454,7 +453,7 @@ class TestBench(Process):
                     log.bench_end_task(self.__pid, self.__current, "Fetching FPGA usage data")
 
                     log.bench_begin_task(self.__pid, self.__current, "Benchmarking")
-                    for benchmark in ['quick_sort', 'sobel']:
+                    for benchmark in ['sobel', 'quick_sort', 'adpcm', 'dotprod', 'vecsum']:
 
                         aux= {}
 
@@ -471,10 +470,9 @@ class TestBench(Process):
 
                         result[benchmark] = aux
 
-
-
                     log.bench_end_task(self.__pid, self.__current, "Benchmarking")
-                    print(result)
+
+                    self.__result.put(result)
 
 
 
@@ -522,19 +520,19 @@ if __name__ == '__main__':
     result = Queue()
     prefix = 'q'
 
-    # db_ = db()
-    # db_.generate_cores(1)
-    #
-    # gen1 = Generator_on_db(target, prefix, base, toBenchmark)
-    # gen2 = Generator_on_db(target, prefix, base, toBenchmark)
+    db_ = db()
+    db_.generate_cores(10)
+    # #
+    gen1 = Generator_on_db(target, prefix, base, toBenchmark)
+    gen2 = Generator_on_db(target, prefix, base, toBenchmark)
     # gen3 = Generator_on_db(target, prefix, base, toBenchmark)
     # gen4 = Generator_on_db(target, prefix, base, toBenchmark)
-    #
-    # gen1.start()
-    # gen2.start()
+    # #
+    gen1.start()
+    gen2.start()
     # gen3.start()
     # gen4.start()
-    #
+    # #
     # gen1.join()
     # gen2.join()
     # gen3.join()
@@ -551,15 +549,17 @@ if __name__ == '__main__':
     ben1.start()
     # ben2.start()
 
-    results = []
+    # results = []
+    #
+    # for x in range(1, 6):
+    #     toBenchmark.put(x)
 
-    for x in range(1, 2):
-        toBenchmark.put(x)
+    x = 0
 
-
-    while len(results) < 1:
+    while x < 10:
         try:
-            results.append(result.get_nowait())
+            db_.insert_results(result.get_nowait())
+            x+=1
         except Exception:
             time.sleep(1)
             # print('\n')
@@ -568,8 +568,6 @@ if __name__ == '__main__':
 
     ben1.terminate()
     # ben2.terminate()
-
-    print(results)
 
 
     #MAIN 1

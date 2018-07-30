@@ -65,6 +65,7 @@ class db(object):
                                                 sobel INTEGER  DEFAULT 0,
                                                 vecsum INTEGER  DEFAULT 0,
                                                 quicksort INTEGER  DEFAULT 0,
+                                                dotprod INTEGER  DEFAULT 0,
                                                 alm INTEGER  DEFAULT 0,
                                                 memory INTEGER  DEFAULT 0,
                                                 ram INTEGER DEFAULT 0
@@ -176,6 +177,32 @@ class db(object):
                 cur.execute("end")
                 time.sleep(1)
 
+    def insert_results(self, results:dict):
+        cur = self.__conn.cursor()
+        cur.execute("UPDATE core SET "
+                    "adpcm = ?, "
+                    "sobel = ?, "
+                    "vecsum = ?, "
+                    "quicksort = ?, "
+                    "dotprod=?, "
+                    "alm = ?, "
+                    "memory = ?, "
+                    "ram = ? "
+                    "WHERE id_core= ? ",
+
+                    (results['adpcm']['time'],
+                     results['sobel']['time'],
+                     results['vecsum']['time'],
+                     results['quick_sort']['time'],
+                     results['dotprod']['time'],
+                     results['alm'],
+                     results['memory'],
+                     results['ram'],
+                     results['id'])
+                    )
+
+        self.__conn.commit()
+
 
 
     def generate_cores(self, size):
@@ -206,15 +233,19 @@ def worker():
 if __name__ == "__main__":
 
     db_ = db()
-    db_.generate_cores(100)
 
 
-    p1 = Process(target=worker)
-    p2 = Process(target=worker)
-    p1.start()
-    p2.start()
-    p1.join()
-    p2.join()
+    db_.insert_results({'alm': 1612, 'memory': 845952, 'ram': 110, 'id': 1, 'sobel': {'time': 1223794.0, 'times': [1223794, 1223794, 1223794, 1223794, 1223794, 1223794, 1223794, 1223794, 1223794, 1223794]}, 'quick_sort': {'time': 1718351.0, 'times': [1223794, 1223794, 1718351, 1718351, 1718351, 1718351, 1718351, 1718351, 1718351, 1718351]}, 'adpcm': {'time': 1062082.0, 'times': [1718351, 1718351, 1062082, 1062082, 1062082, 1062082, 1062082, 1062082, 1062082, 1062082]}, 'dotprod': {'time': 55353.0, 'times': [1062082, 1062082, 55353, 55353, 55353, 55353, 55353, 55353, 55353, 55353]}, 'vecsum': {'time': 67529.0, 'times': [55353, 55353, 67529, 67529, 67529, 67529, 67529, 67529, 67529, 67529]}})
+
+    # db_.generate_cores(100)
+    #
+    #
+    # p1 = Process(target=worker)
+    # p2 = Process(target=worker)
+    # p1.start()
+    # p2.start()
+    # p1.join()
+    # p2.join()
 
 
     #
