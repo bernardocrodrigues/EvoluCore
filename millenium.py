@@ -177,6 +177,33 @@ class db(object):
                 cur.execute("end")
                 time.sleep(1)
 
+    def get_core_ready_to_bench(self, id_core:int):
+        cur = self.__conn.cursor()
+        cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (-2, -2, id_core))
+        self.__conn.commit()
+
+    def get_benchable_core(self):
+        cur = self.__conn.cursor()
+        result = None
+        while True:
+            try:
+                cur.execute("begin")
+                result = cur.execute("select * from core where sobel=-2 and alm=-2").fetchone()
+                names = [description[0] for description in cur.description]
+                if result == None:
+                    return None
+                else:
+                    cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (-3, -3, result[0]))
+                    cur.execute("end")
+                    core ={}
+                    for param, value in zip(names, result):
+                        core[param] = value
+                    return core
+            except sqlite3.OperationalError:
+                cur = self.__conn.cursor()
+                cur.execute("end")
+                time.sleep(1)
+
     def insert_results(self, results:dict):
         cur = self.__conn.cursor()
         cur.execute("UPDATE core SET "
@@ -189,7 +216,6 @@ class db(object):
                     "memory = ?, "
                     "ram = ? "
                     "WHERE id_core= ? ",
-
                     (results['adpcm']['time'],
                      results['sobel']['time'],
                      results['vecsum']['time'],
@@ -202,6 +228,18 @@ class db(object):
                     )
 
         self.__conn.commit()
+
+    def invalidate_core(self, id_core:int):
+        cur = self.__conn.cursor()
+        cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (-4, -4, id_core))
+        self.__conn.commit()
+
+    def give_back(self, id_core: int):
+        cur = self.__conn.cursor()
+        cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (0, 0, id_core))
+        self.__conn.commit()
+
+
 
 
 

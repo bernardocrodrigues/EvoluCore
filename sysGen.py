@@ -1,5 +1,5 @@
 import os, subprocess, shutil
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Value
 import time
 from functools import reduce
 import parse
@@ -52,8 +52,12 @@ class log:
 
     @classmethod
     def bench_error_message(cls, pid, core, message):
-        print(cls.HEADER + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + cls.FAIL + str(
+        print(cls.OKBLUE + str(pid) + cls.ENDC + " | " + cls.BOLD + str(core) + cls.ENDC + " | " + cls.FAIL + str(
             message))
+
+    @classmethod
+    def bench_exit_message(cls, pid):
+        print(cls.OKBLUE + str(pid) + cls.ENDC + " | - | " + cls.OKGREEN + "DONE!")
 
 
 
@@ -164,7 +168,7 @@ class Generator(Process):
 
 class Generator_on_db(Process):
 
-    def __init__(self, rootDir, prefix, referenceDir, toBenchmark):
+    def __init__(self, rootDir, prefix, referenceDir, toBenchmark, running):
 
         Process.__init__(self)
         self.__rootDir = rootDir
@@ -174,6 +178,7 @@ class Generator_on_db(Process):
         self.__prefix = prefix
         self.__referenceDir = referenceDir
         self.__toBenchmark = toBenchmark
+        self.__running =running
 
         baseFile = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/baseOriginal.qsys"
         targetDir = "/home/bcrodrigues/tcc/qsys/"
@@ -250,11 +255,18 @@ class Generator_on_db(Process):
             if code.returncode != 0:
                 raise Exception('Erro no make')
 
+    def _cleanUp(self):
+        try:
+            shutil.rmtree(self.__workingDir)
+            os.remove(self.__rootDir+'/qsys/q'+str(self.__current['id_core'])+'.qsys')
+            os.remove(self.__rootDir+'/qsys/q'+str(self.__current['id_core'])+'.sopcinfo')
+        except Exception:
+            log.bench_error_message(self.__pid,self.__current['id_core'], "ERROR! \n" + traceback.format_exc())
+
     def run(self):
 
         self.__pid = os.getpid()
-
-        while True:
+        while self.__running.value:
             self.__current = self.__db.get_free_core()
             if self.__current == None:
                 log.exit_message(self.__pid)
@@ -270,27 +282,40 @@ class Generator_on_db(Process):
                     self._setupFolder()
                     log.end_task(self.__pid, str(self.__current['id_core']), "QSYS files and folders")
 
+                    if not self.__running.value:
+                        break
+
                     log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling QSYS")
                     self._populateQsys()
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling QSYS")
+
+                    if not self.__running.value:
+                        break
 
                     log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Quartus Project")
                     self._compileQuartus()
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Quartus Project")
 
+                    if not self.__running.value:
+                        break
+
                     log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
                     self._compileSoftware(['sobel', 'quick_sort', 'adpcm', 'dotprod', 'vecsum'])
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
 
-                    self.__toBenchmark.put(int(self.__current['id_core']))
+                    self.__db.get_core_ready_to_bench(self.__current['id_core'])
                     log.success(self.__pid, str(self.__current['id_core']))
 
                 except Exception:
                     log.error_message(self.__pid, str(self.__current['id_core']), "ERROR! \n" + traceback.format_exc())
 
+        self.__db.give_back(self.__current['id_core'])
+        self._cleanUp()
+        log.exit_message(self.__pid)
+
 class TestBench(Process):
 
-    def __init__(self, rootDir, toBenchmark, prefix, referenceDir, cable, result):
+    def __init__(self, rootDir, prefix, referenceDir, cable, result, cleanUp, running):
 
         Process.__init__(self)
         self.__rootDir = rootDir
@@ -299,10 +324,11 @@ class TestBench(Process):
         self.__pid = None
         self.__prefix = prefix
         self.__referenceDir = referenceDir
-        self.__toBenchmark = toBenchmark
         self.__cable = cable
-
+        self.__cleanUp =cleanUp
         self.__result = result
+        self.__running =running
+        self.__db = db()
 
     def _configureBoard(self):
 
@@ -355,12 +381,12 @@ class TestBench(Process):
 
         while True:
 
-            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 15', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 4', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
             aux = []
             for x in range(10):
                 for line in iter(p.stdout.readline, b''):
-                    string = line.decode("utf-8")
                     try:
+                        string = line.decode("utf-8")
                         aux.append(int(string))
                     except:
                         pass
@@ -370,8 +396,10 @@ class TestBench(Process):
                 result = reduce(lambda x, y: x + y, aux[4:]) / len(aux[4:])
             except:
                 if retry > 0:
+                    subprocess.run(["nios2-download", "-r", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL)
                     subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-                    subprocess.run(["kill", str(p.pid)])
+                    # subprocess.run(["kill", str(p.pid)])
                     retry -= 1
                 else:
                     subprocess.run(["kill", str(p.pid)])
@@ -421,12 +449,21 @@ class TestBench(Process):
 
             return result
 
+    def _cleanUp(self):
+        try:
+            shutil.rmtree(self.__workingDir)
+            os.remove(self.__rootDir+'/qsys/q'+self.__current+'.qsys')
+            os.remove(self.__rootDir+'/qsys/q'+self.__current+'.sopcinfo')
+        except Exception:
+            log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
+
     def run(self):
 
         self.__pid = os.getpid()
-        while True:
+        while self.__running.value:
             try:
-                self.__current = str(self.__toBenchmark.get_nowait())
+                # self.__current = str(self.__toBenchmark.get_nowait())
+                self.__current = str(self.__db.get_benchable_core()['id_core'])
             except Exception:
                 time.sleep(1)
             else:
@@ -440,11 +477,10 @@ class TestBench(Process):
                     log.bench_end_task(self.__pid, self.__current, "Configuring Board")
                 except FileNotFoundError:
                     log.error_message(self.__pid, str(self.__current), "ERROR! Invalid Core")
-                    #todo atualizar banco
+                    self.__db.invalidate_core(int(self.__current))
 
                 except Exception:
                     log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
-
                 else:
 
                     log.bench_begin_task(self.__pid, self.__current, "Fetching FPGA usage data")
@@ -470,43 +506,14 @@ class TestBench(Process):
 
                         result[benchmark] = aux
 
+                    if self.__cleanUp:
+                        self._cleanUp()
+                        log.bench_end_task(self.__pid, self.__current, "Cleaning up ")
+
                     log.bench_end_task(self.__pid, self.__current, "Benchmarking")
+                    self.__db.insert_results(result)
 
-                    self.__result.put(result)
-
-
-
-
-
-                # self.__workingDir = self.__rootDir +'/'+self.__current+'/'
-                # try:
-                #     self._configureBoard()
-                # except FileNotFoundError:
-                #     result = {}
-                #     result['id'] = int(self.__current)
-                #     result['time'] = -1
-                #     self.__result.put(result)
-                #     print(bcolors.FAIL)
-                #     print(str(self.__pid) + " " + self.__current + " INVALIDO")
-                #     print(bcolors.ENDC)
-                # else:
-                #     print(bcolors.FAIL)
-                #     print(str(self.__pid) + " " + self.__current + " config")
-                #     print(bcolors.ENDC)
-                #
-                #     result = self._getUsageData()
-                #     result['id'] = int(self.__current)
-                #
-                #     benchmarks = ['sobel']
-                #
-                #     for benchmark in benchmarks:
-                #
-                #
-                #
-                #     self.__result.put(result)
-                #     print(bcolors.FAIL)
-                #     print(str(self.__pid) + " " + self.__current + " bench")
-                #     print(bcolors.ENDC)
+        log.bench_exit_message(self.__pid)
 
 
 
@@ -519,19 +526,21 @@ if __name__ == '__main__':
     toBenchmark = Queue()
     result = Queue()
     prefix = 'q'
-
     db_ = db()
-    db_.generate_cores(10)
-    # #
-    gen1 = Generator_on_db(target, prefix, base, toBenchmark)
-    gen2 = Generator_on_db(target, prefix, base, toBenchmark)
-    # gen3 = Generator_on_db(target, prefix, base, toBenchmark)
-    # gen4 = Generator_on_db(target, prefix, base, toBenchmark)
+
+    running = Value('b', True)
+
+    # db_.generate_cores(1000)
+    #
+    gen1 = Generator_on_db(target, prefix, base, toBenchmark, running)
+    gen2 = Generator_on_db(target, prefix, base, toBenchmark, running)
+    gen3 = Generator_on_db(target, prefix, base, toBenchmark, running)
+    gen4 = Generator_on_db(target, prefix, base, toBenchmark, running)
     # #
     gen1.start()
     gen2.start()
-    # gen3.start()
-    # gen4.start()
+    gen3.start()
+    gen4.start()
     # #
     # gen1.join()
     # gen2.join()
@@ -539,35 +548,51 @@ if __name__ == '__main__':
     # gen4.join()
 
 
-
-
     #MAIN 2
 
-    ben1 = TestBench(target, toBenchmark, prefix, base, 1, result)
-    # ben2 = TestBench(target, toBenchmark, prefix, base, 2, result)
+    ben1 = TestBench(target, prefix, base, 1, result, True, running)
+    ben2 = TestBench(target, prefix, base, 2, result, True, running)
 
     ben1.start()
-    # ben2.start()
+    ben2.start()
 
-    # results = []
-    #
-    # for x in range(1, 6):
+    results = []
+
+
+
+    while True:
+        cmd = input()
+        if cmd == 'exit':
+            break
+
+    print("Finishing Tasks...")
+    running.value = False
+    gen1.join()
+    gen2.join()
+    gen3.join()
+    gen4.join()
+    print("Shutting down...")
+    exit(0)
+
+
+
+    # for x in range(1, 5):
     #     toBenchmark.put(x)
+    # while x < 10:
+    #     try:
+    #         db_.insert_results(result.get_nowait())
+    #         x += 1
+    #     except KeyboardInterrupt:
+    #         running.value = False
+    #         gen1.join()
+    #         gen2.join()
+    #         gen3.join()
+    #         gen4.join()
+    #         exit(0)
+    #     except Exception:
+    #         time.sleep(1)
 
-    x = 0
 
-    while x < 10:
-        try:
-            db_.insert_results(result.get_nowait())
-            x+=1
-        except Exception:
-            time.sleep(1)
-            # print('\n')
-            # for i in results:
-            #     print(i)
-
-    ben1.terminate()
-    # ben2.terminate()
 
 
     #MAIN 1
