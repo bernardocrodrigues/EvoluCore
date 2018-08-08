@@ -59,6 +59,11 @@ class log:
     def bench_exit_message(cls, pid):
         print(cls.OKBLUE + str(pid) + cls.ENDC + " | - | " + cls.OKGREEN + "DONE!")
 
+    @classmethod
+    def bench_numbers(cls, nums):
+        print(cls.WARNING)
+        print(nums)
+        print(cls.ENDC)
 
 
 
@@ -394,6 +399,7 @@ class TestBench(Process):
                         break
             try:
                 result = reduce(lambda x, y: x + y, aux[4:]) / len(aux[4:])
+                log.bench_numbers(aux+[result])
             except:
                 if retry > 0:
                     subprocess.run(["nios2-download", "-r", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL,
