@@ -64,44 +64,47 @@ def get_pareto_fittest(full_space: np.array, num: int):
 
 def sumerize_frontier(full_space: np.array, num: int):
 
+    space = full_space
 
-    greatest= -1
-    greatest_distance = -1
+    while(np.shape(space)[0] > num):
+        greatest = -1
+        greatest_distance = -1
 
-    for i, candidate in enumerate(full_space):
+        for i, candidate in enumerate(space):
 
-        previous_slice = full_space[:i, :]
-        next_slice = full_space[i + 1:, :]
-        candidate_less_space = np.vstack((previous_slice, next_slice))
-        distance = get_total_space_distance(candidate_less_space)
-
-        if greatest_distance == -1:
-            greatest = i
-            greatest_distance = distance
-        elif greatest_distance < distance:
-            greatest = i
-            greatest_distance = distance
-        elif greatest_distance == distance:
-
-            previous_slice = full_space[:i, :]
-            next_slice = full_space[i + 1:, :]
+            previous_slice = space[:i, :]
+            next_slice = space[i + 1:, :]
             candidate_less_space = np.vstack((previous_slice, next_slice))
-            deviation1 = get_total_space_distance_std_deviation(candidate_less_space)
+            distance = get_total_space_distance(candidate_less_space)
 
-            previous_slice = full_space[:greatest, :]
-            next_slice = full_space[greatest + 1:, :]
-            candidate_less_space = np.vstack((previous_slice, next_slice))
-            deviation2 = get_total_space_distance_std_deviation(candidate_less_space)
-
-            if deviation1 < deviation2:
+            if greatest_distance == -1:
                 greatest = i
                 greatest_distance = distance
+            elif greatest_distance < distance:
+                greatest = i
+                greatest_distance = distance
+            elif greatest_distance == distance:
 
+                previous_slice = space[:i, :]
+                next_slice = space[i + 1:, :]
+                candidate_less_space = np.vstack((previous_slice, next_slice))
+                deviation1 = get_total_space_distance_std_deviation(candidate_less_space)
 
+                previous_slice = space[:greatest, :]
+                next_slice = space[greatest + 1:, :]
+                candidate_less_space = np.vstack((previous_slice, next_slice))
+                deviation2 = get_total_space_distance_std_deviation(candidate_less_space)
 
+                if deviation1 < deviation2:
+                    greatest = i
+                    greatest_distance = distance
 
+        print(greatest)
+        space = np.delete(space, greatest, 0)
 
-    print(greatest)
+        print(space)
+
+    return space
 
         # print(get_total_space_distance(candidate_less_space))
         # print(get_total_space_distance_std_deviation(candidate_less_space))
@@ -144,7 +147,9 @@ def get_total_space_distance(full_space: np.array):
     for i, candidate in enumerate(full_space):
         distances.append(np.sum(np.sqrt((full_space - candidate)**2)))
 
+
     print(distances)
+
     return reduce(lambda x, y: x + y, distances) / len(distances)
 
 def get_total_space_distance_std_deviation(full_space: np.array):
@@ -152,7 +157,6 @@ def get_total_space_distance_std_deviation(full_space: np.array):
     for i, candidate in enumerate(full_space):
         distances.append(np.sum(np.sqrt((full_space - candidate)**2)))
     return np.std(distances)
-
 
 def closest_two_nodes(full_space: np.array):
 
@@ -211,8 +215,6 @@ def std_deviation_of_points_distances(node, nodes):
 
 def average_of_points_distances(node, nodes):
 
-
-
     average = np.average(np.sqrt(np.sum((nodes - node) ** 2, axis=1)))
     return(average)
 
@@ -220,27 +222,25 @@ def average_of_points_distances(node, nodes):
 
 
 
-data = get_data()
+# data = get_data()
 
-data = np.array([[1,1],
-                 [1,2],
-                 [1,4],
-                 [1,5]])
+data = np.array([[1,1,1],
+                 [1,2,2],
+                 [1,4,400],
+                 [1,5,5]])
 
-sumerize_frontier(data, 1)
+# print(sumerize_frontier(data, 2))
+
+sumerize_frontier(data, 2)
+
 exit()
 
-# frontier, dominados = get_frontier(data)
-# frontiers, dominados = get_frontiers(data, 2)
 
-fittest, dominated = get_pareto_fittest(data, 5)
-
-
-print(fittest)
-# for frontier in frontiers:
-#     print(frontier)
-
-print(dominated)
+# fittest, dominated = get_pareto_fittest(data, 5)
+#
+# print(fittest)
+#
+# print(dominated)
 
 
 
