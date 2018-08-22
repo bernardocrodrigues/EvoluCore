@@ -25,7 +25,6 @@ def get_frontier(full_space: np.array):
         for candidate in frontier:
             dominated_indexes = get_strongly_dominated(candidate, frontier)
             if np.any(dominated_indexes):
-                # print('vai tirar alguem')
                 dominated.append(frontier[dominated_indexes])
                 frontier = frontier[~dominated_indexes]
                 break
@@ -50,15 +49,22 @@ def get_frontiers(full_space: np.array, num: int):
     return frontiers, space
 
 def get_pareto_fittest(full_space: np.array, num: int):
+
     fittest, space = get_frontier(full_space)
+
+    # print(fittest.shape[0] - num)
+
+    if fittest.shape[0] > num:
+        fittest = sumerize_frontier_with_id(fittest, num)
+
     while fittest.shape[0] < num:
         frontier, dominated = get_frontier(space)
 
-        if (fittest.shape[0] + fittest.shape[0]) > num:
-            print('tem q podar')
-        else:
-            fittest = np.vstack((fittest,frontier))
-            space = dominated
+        if fittest.shape[0] + frontier.shape[0] > num:
+            frontier = sumerize_frontier_with_id(frontier, (fittest.shape[0] + frontier.shape[0]) - num)
+
+        fittest = np.vstack((fittest, frontier))
+        space = dominated
 
     return fittest, space
 
@@ -106,35 +112,51 @@ def sumerize_frontier(full_space: np.array, num: int):
 
     return space
 
-        # print(get_total_space_distance(candidate_less_space))
-        # print(get_total_space_distance_std_deviation(candidate_less_space))
-        # print('\n')
+def sumerize_frontier_with_id(full_space: np.array, num: int):
 
-    # for i, candidate in enumerate(full_space):
-    #     previous_slice = full_space[:i, :]
-    #     next_slice = full_space[i + 1:, :]
-    #     candidate_less_space = np.vstack((previous_slice, next_slice))
-    #
-    #     media = []
-    #     for i2, candidate2 in enumerate(candidate_less_space):
-    #         media.append(get_total_distante_other_nodes(candidate2,candidate_less_space))
-    #
-    #     print(media)
+    space = full_space[:, 1:]
+    space_with_core_id = full_space
 
-        # print(candidate_less_space)
-        #
-        # print(average_average_deviation(candidate_less_space), '\n')
 
-        # print(get_total_distante_other_nodes(candidate, candidate_less_space))
+    while(np.shape(space)[0] > num):
 
-    # print(average_std_deviation(full_space))
-    #
-    # for i, candidate in enumerate(full_space):
-    #     previous_slice = full_space[:i, :]
-    #     next_slice = full_space[i + 1:, :]
-    #     candidate_less_space = np.vstack((previous_slice, next_slice))
-    #     print(average_average_deviation(candidate_less_space), average_std_deviation(candidate_less_space))
-    #     # print(average_std_deviation(candidate_less_space))
+        greatest = -1
+        greatest_distance = -1
+
+        for i, candidate in enumerate(space):
+
+            previous_slice = space[:i, :]
+            next_slice = space[i + 1:, :]
+            candidate_less_space = np.vstack((previous_slice, next_slice))
+            distance = get_total_space_distance(candidate_less_space)
+
+            if greatest_distance == -1:
+                greatest = i
+                greatest_distance = distance
+            elif greatest_distance < distance:
+                greatest = i
+                greatest_distance = distance
+            elif greatest_distance == distance:
+
+                previous_slice = space[:i, :]
+                next_slice = space[i + 1:, :]
+                candidate_less_space = np.vstack((previous_slice, next_slice))
+                deviation1 = get_total_space_distance_std_deviation(candidate_less_space)
+
+                previous_slice = space[:greatest, :]
+                next_slice = space[greatest + 1:, :]
+                candidate_less_space = np.vstack((previous_slice, next_slice))
+                deviation2 = get_total_space_distance_std_deviation(candidate_less_space)
+
+                if deviation1 < deviation2:
+                    greatest = i
+                    greatest_distance = distance
+
+
+        space = np.delete(space, greatest, 0)
+        space_with_core_id = np.delete(space_with_core_id, greatest, 0)
+
+    return space_with_core_id
 
 def get_total_distante_other_nodes(node, nodes):
 
@@ -148,7 +170,7 @@ def get_total_space_distance(full_space: np.array):
         distances.append(np.sum(np.sqrt((full_space - candidate)**2)))
 
 
-    print(distances)
+    # print(distances)
 
     return reduce(lambda x, y: x + y, distances) / len(distances)
 
@@ -222,18 +244,26 @@ def average_of_points_distances(node, nodes):
 
 
 
-# data = get_data()
 
-data = np.array([[1,1,1],
-                 [1,2,2],
-                 [1,4,400],
-                 [1,5,5]])
+
+
+data = get_data()
+
+# data = data[:, 1:]
+
+print(get_pareto_fittest(data, 3))
+# print(sumerize_frontier_with_id(data, 6))
+
+# print(get_pareto_fittest(data, 6))
+
+# data = np.array([[1,1,1],
+#                  [1,2,2],
+#                  [1,4,400],
+#                  [1,5,5]])
 
 # print(sumerize_frontier(data, 2))
 
-sumerize_frontier(data, 2)
-
-exit()
+# sumerize_frontier(data, 2)
 
 
 # fittest, dominated = get_pareto_fittest(data, 5)
