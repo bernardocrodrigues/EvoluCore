@@ -1,10 +1,6 @@
 
 import sqlite3
-
-import random
-from pprint import pprint
 import time
-from multiprocessing import Process
 import os
 import random
 
@@ -39,7 +35,7 @@ class db(object):
                     ]
 
     def __init__(self):
-        self.__conn = sqlite3.connect('millenium.db', isolation_level='EXCLUSIVE')
+        self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
 
     def init(self):
         self.__conn.executescript("""
@@ -182,6 +178,8 @@ class db(object):
         cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (-2, -2, id_core))
         self.__conn.commit()
 
+
+
     def get_benchable_core(self):
         cur = self.__conn.cursor()
         result = None
@@ -203,6 +201,8 @@ class db(object):
                 cur = self.__conn.cursor()
                 cur.execute("end")
                 time.sleep(1)
+
+
 
     def insert_results(self, results:dict):
         cur = self.__conn.cursor()
@@ -234,10 +234,14 @@ class db(object):
         cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (-4, -4, id_core))
         self.__conn.commit()
 
+
+
     def give_back(self, id_core: int):
         cur = self.__conn.cursor()
         cur.execute("UPDATE core SET sobel = ? ,alm = ? WHERE id_core= ? ", (0, 0, id_core))
         self.__conn.commit()
+
+
 
 
 

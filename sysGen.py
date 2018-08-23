@@ -4,7 +4,7 @@ import time
 from functools import reduce
 import parse
 import xmlParse
-from millenium import db
+from libs.millenium.millenium import db
 import traceback
 
 

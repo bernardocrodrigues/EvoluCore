@@ -242,11 +242,6 @@ def average_of_points_distances(node, nodes):
 
 
 
-
-
-
-
-
 data = get_data()
 
 # data = data[:, 1:]
