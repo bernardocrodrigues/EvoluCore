@@ -257,7 +257,6 @@ class db(object):
                     self.insert_core(core)
                     inserted += 1
 
-
 def worker():
 
     db_ = db()
@@ -267,10 +266,6 @@ def worker():
         print(os.getpid(), core)
         time.sleep(random.random()/10)
         core = db_.get_free_core()
-
-
-
-
 
 if __name__ == "__main__":
 

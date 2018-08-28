@@ -5,7 +5,7 @@ from functools import reduce
 def get_data():
     conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
     cur = conn.cursor()
-    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(10))
+    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(20))
 
 def get_strongly_dominated(reference: np.array, space: np.array):
 
@@ -44,29 +44,34 @@ def get_frontiers(full_space: np.array, num: int):
     for x in range(num):
         frontier, dominated = get_frontier(space)
         frontiers.append(frontier)
-        space = dominated
+        if dominated.size == 0:
+            space = dominated
+            break
+        else:
+            space = dominated
 
     return frontiers, space
 
 def get_pareto_fittest(full_space: np.array, num: int):
 
-    fittest, space = get_frontier(full_space)
+    if num > 0 and num <= full_space.shape[0]:
+        fittest, space = get_frontier(full_space)
 
-    # print(fittest.shape[0] - num)
+        if fittest.shape[0] > num:
+            fittest, discarted = sumerize_frontier_with_id(fittest, num)
+            space = np.vstack((space,discarted))
+        else:
+            while fittest.shape[0] < num:
+                frontier, dominated = get_frontier(space)
+                if fittest.shape[0] + frontier.shape[0] > num:
+                    frontier, discarted = sumerize_frontier_with_id(frontier, (num - fittest.shape[0]))
+                    dominated = np.vstack((dominated, discarted))
+                fittest = np.vstack((fittest, frontier))
+                space = dominated
 
-    if fittest.shape[0] > num:
-        fittest = sumerize_frontier_with_id(fittest, num)
-
-    while fittest.shape[0] < num:
-        frontier, dominated = get_frontier(space)
-
-        if fittest.shape[0] + frontier.shape[0] > num:
-            frontier = sumerize_frontier_with_id(frontier, (fittest.shape[0] + frontier.shape[0]) - num)
-
-        fittest = np.vstack((fittest, frontier))
-        space = dominated
-
-    return fittest, space
+        return fittest, space
+    else:
+        raise ValueError
 
 def sumerize_frontier(full_space: np.array, num: int):
 
@@ -116,6 +121,7 @@ def sumerize_frontier_with_id(full_space: np.array, num: int):
 
     space = full_space[:, 1:]
     space_with_core_id = full_space
+    discarted = []
 
 
     while(np.shape(space)[0] > num):
@@ -152,11 +158,13 @@ def sumerize_frontier_with_id(full_space: np.array, num: int):
                     greatest = i
                     greatest_distance = distance
 
-
+        discarted.append(space_with_core_id[greatest])
         space = np.delete(space, greatest, 0)
         space_with_core_id = np.delete(space_with_core_id, greatest, 0)
 
-    return space_with_core_id
+    discarted = np.vstack(discarted)
+    # print(discarted)
+    return space_with_core_id, discarted
 
 def get_total_distante_other_nodes(node, nodes):
 
@@ -242,30 +250,34 @@ def average_of_points_distances(node, nodes):
 
 
 
-data = get_data()
 
-# data = data[:, 1:]
+if __name__ == "__main__":
 
-print(get_pareto_fittest(data, 3))
-# print(sumerize_frontier_with_id(data, 6))
+    data = get_data()
 
-# print(get_pareto_fittest(data, 6))
-
-# data = np.array([[1,1,1],
-#                  [1,2,2],
-#                  [1,4,400],
-#                  [1,5,5]])
-
-# print(sumerize_frontier(data, 2))
-
-# sumerize_frontier(data, 2)
+    # data = data[:, 1:]
 
 
-# fittest, dominated = get_pareto_fittest(data, 5)
-#
-# print(fittest)
-#
-# print(dominated)
+    print(get_pareto_fittest(data, 9))
+    # print(sumerize_frontier_with_id(data, 6))
+
+    # print(get_pareto_fittest(data, 6))
+
+    # data = np.array([[1,1,1],
+    #                  [1,2,2],
+    #                  [1,4,400],
+    #                  [1,5,5]])
+
+    # print(sumerize_frontier(data, 2))
+
+    # sumerize_frontier(data, 2)
+
+
+    # fittest, dominated = get_pareto_fittest(data, 5)
+    #
+    # print(fittest)
+    #
+    # print(dominated)
 
 
 
