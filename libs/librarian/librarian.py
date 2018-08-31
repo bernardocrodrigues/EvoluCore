@@ -55,7 +55,7 @@ class librarian(object):
 if __name__ == "__main__":
 
     lib = librarian()
-    print(lib.get_benchmark_data(limit=5, metrics=["alm, memory"]))
 
+    print(lib.get_benchmark_data(limit=5, metrics=["alm, memory"]))
     print(lib.get_core_characteristics(10))
 

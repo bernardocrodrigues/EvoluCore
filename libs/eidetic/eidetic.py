@@ -61,26 +61,56 @@ class eidetic(object):
         plt.clf()
 
     @staticmethod
-    def plot_3D(data: list, types=None, file="output.png", labels=False, tittle="", xlabel="", ylabel=""):
+    def plot_3D(data: list, types=None, file="output.png", labels=False, tittle="", xlabel="", ylabel="", zlabel=""):
 
         traces = []
+        marker = [ "circle" ,  "square"]
 
-        for datum in data:
-            traces.append(
-                go.Scatter3d(
-                    x=datum[:,1],
-                    y=datum[:,2],
-                    z=datum[:,3],
-                    mode='markers',
-                    marker=dict(
-                        size=2,
-                        # line=dict(
-                        #     color='rgba(217, 217, 217, 0.14)',
-                        #     width=0.1
-                        # ),
-                        opacity=1
-                    )
-                ))
+        for idx, datum in enumerate(data):
+            if idx == 0:
+                traces.append(
+                    go.Scatter3d(
+                        text=datum[:, 4],
+                        x=datum[:,1],
+                        y=datum[:,2],
+                        z=datum[:,3],
+                        mode='markers',
+
+                        marker=dict(
+                            colorbar = dict(thickness=50, x=0.2),
+                            symbol = marker[idx],
+                            size=5,
+                            color=datum[:, 7],  # set color to an array/list of desired values
+                            # colorscale='Viridis',
+                            line=dict(
+                                color='black',
+                                width=0.2
+                            ),
+                            opacity=0.7
+                        )
+                    ))
+            else:
+                traces.append(
+                    go.Scatter3d(
+                        text=datum[:, 4],
+                        x=datum[:, 1],
+                        y=datum[:, 2],
+                        z=datum[:, 3],
+                        mode='markers',
+
+                        marker=dict(
+                            colorbar=dict(thickness=50, x=0.2),
+                            symbol=marker[idx],
+                            size=5,
+                            color=datum[:, 7],  # set color to an array/list of desired values
+                            # colorscale='Viridis',
+                            # line=dict(
+                            #     color='black',
+                            #     width=0.1
+                            # ),
+                            opacity=0.7
+                        )
+                    ))
 
         layout = go.Layout(
             margin=dict(
@@ -174,20 +204,20 @@ if __name__ == "__main__":
     import libs.paretoFrontier.paretoFrontier as pf
     lib_ = libs.librarian.librarian.librarian()
 
-    data = lib_.get_benchmark_data(limit=15, metrics=["alm, ram"])
+    data = lib_.get_benchmark_data(benchmark="adpcm", metrics=["quicksort", "sobel", "vecsum", "dotprod", "memory", "ram", "alm"])
     # data = lib_.get_data(20)
 
-    frontiers, _ = pf.get_frontiers(data, 2)
+    # frontiers, _ = pf.get_frontiers(data, 2)
 
 
 
     # eidetic.plot_3D([data[0:100], data[101:200]])
-    eidetic.plot_3D(frontiers)
+    # eidetic.plot_3D(frontiers)
 
 
 
-    # fittest, dominated = pf.get_pareto_fittest(data, 1)
-    # eidetic.plot_3D([fittest, dominated])
+    fittest, dominated = pf.get_pareto_fittest(data, 500)
+    eidetic.plot_3D([fittest, dominated])
 
     # print(fittest, dominated)
 
@@ -204,8 +234,8 @@ if __name__ == "__main__":
     # eidetic.plot(data=frontiers,
     #              file="output2.png")
 
-    eidetic.plot_3Din2D(data=frontiers,
-                        file="output2.png")
+    # eidetic.plot_3Din2D(data=frontiers,
+    #                     file="output2.png")
 
 
 
