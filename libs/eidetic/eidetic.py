@@ -61,27 +61,29 @@ class eidetic(object):
         plt.clf()
 
     @staticmethod
-    def plot_3D(data: list, types=None, file="output.png", labels=False, tittle="", xlabel="", ylabel="", zlabel=""):
+    def plot_3D(data: list, types=None, file="output.png", labels=False, title="", xlabel="", ylabel="", zlabel="",barlabel=""):
 
         traces = []
-        marker = [ "circle" ,  "square"]
+        marker = [ "circle" ,  "cross"]
+
+
 
         for idx, datum in enumerate(data):
             if idx == 0:
                 traces.append(
                     go.Scatter3d(
-                        text=datum[:, 4],
+                        text=datum[:, (datum.shape[1]-1)],
                         x=datum[:,1],
                         y=datum[:,2],
                         z=datum[:,3],
                         mode='markers',
 
                         marker=dict(
-                            colorbar = dict(thickness=50, x=0.2),
+                            colorbar = dict(thickness=50, x=0.75, len=0.5, title=barlabel),
                             symbol = marker[idx],
                             size=5,
-                            color=datum[:, 7],  # set color to an array/list of desired values
-                            # colorscale='Viridis',
+                            color=datum[:, (datum.shape[1]-1)],  # set color to an array/list of desired values
+                            colorscale='Viridis',
                             line=dict(
                                 color='black',
                                 width=0.2
@@ -97,19 +99,19 @@ class eidetic(object):
                         y=datum[:, 2],
                         z=datum[:, 3],
                         mode='markers',
-
                         marker=dict(
-                            colorbar=dict(thickness=50, x=0.2),
                             symbol=marker[idx],
                             size=5,
-                            color=datum[:, 7],  # set color to an array/list of desired values
+                            color=datum[:, 4],  # set color to an array/list of desired values
                             # colorscale='Viridis',
                             # line=dict(
                             #     color='black',
                             #     width=0.1
                             # ),
-                            opacity=0.7
-                        )
+                            opacity=0.7,
+                            colorscale = 'Viridis',
+
+                )
                     ))
 
         layout = go.Layout(
@@ -118,6 +120,33 @@ class eidetic(object):
                 r=0,
                 b=0,
                 t=0
+            ),
+            title=title,
+            scene=dict(
+                xaxis=dict(
+                    title=xlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                yaxis=dict(
+                    title=ylabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                zaxis=dict(
+                    title=zlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                )
             )
         )
         fig = go.Figure(data=traces, layout=layout)
@@ -204,11 +233,42 @@ if __name__ == "__main__":
     import libs.paretoFrontier.paretoFrontier as pf
     lib_ = libs.librarian.librarian.librarian()
 
-    data = lib_.get_benchmark_data(benchmark="adpcm", metrics=["quicksort", "sobel", "vecsum", "dotprod", "memory", "ram", "alm"])
+    data = lib_.get_benchmark_data(benchmark="sobel", metrics=["alm", "memory", "ram"])
     # data = lib_.get_data(20)
 
-    # frontiers, _ = pf.get_frontiers(data, 2)
+    frontiers, _ = pf.get_frontiers(data, 2)
 
+    test = frontiers[0][:, 1:]
+    test2 = frontiers[1][:, 1:]
+    # print(test)
+
+    # result = []
+    # for i, item in enumerate(test):
+    #     previous_slice = test[:i, :]
+    #     next_slice = test[i + 1:, :]
+    #     candidate_less_space = np.vstack((previous_slice, next_slice))
+    #     # print(item)
+    #     result.append((item < candidate_less_space).all(axis=1).all())
+    # print(any(result))
+    #
+    # test2 = frontiers[1][:, 1:]
+    # # print(test)
+    #
+    # result = []
+    # for i, item in enumerate(test2):
+    #     previous_slice = test2[:i, :]
+    #     next_slice = test2[i + 1:, :]
+    #     candidate_less_space = np.vstack((previous_slice, next_slice))
+    #     # print(item)
+    #     result.append((item < candidate_less_space).all(axis=1).all())
+    # print(any(result))
+
+    # print(test)
+
+    # print(test)
+    for i, item in enumerate(test2):
+        # print(item)
+        print((item > test).all(axis=1).any())
 
 
     # eidetic.plot_3D([data[0:100], data[101:200]])
@@ -216,8 +276,8 @@ if __name__ == "__main__":
 
 
 
-    fittest, dominated = pf.get_pareto_fittest(data, 500)
-    eidetic.plot_3D([fittest, dominated])
+    # fittest, dominated = pf.get_pareto_fittest(data, 100)
+    # eidetic.plot_3D([fittest, dominated], xlabel="quicksort", title="adpcm", ylabel="alm", zlabel="memory", barlabel="ram")
 
     # print(fittest, dominated)
 

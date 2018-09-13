@@ -5,7 +5,7 @@ from functools import reduce
 def get_data():
     conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
     cur = conn.cursor()
-    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(20))
+    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(1000))
 
 def get_strongly_dominated(reference: np.array, space: np.array):
 
@@ -30,7 +30,6 @@ def get_frontier(full_space: np.array):
                 break
         else:
             searching = False
-
     if len(dominated) > 0:
         return frontier, np.vstack(dominated)
     else:
@@ -248,17 +247,93 @@ def average_of_points_distances(node, nodes):
     average = np.average(np.sqrt(np.sum((nodes - node) ** 2, axis=1)))
     return(average)
 
+def fast_non_dominated_sort(full_space: np.array):
+
+    frontier = np.array(full_space[0:1])
+    no_core_id_frontier = frontier[:,1:]
+
+    for candidate in full_space[1:,]:
+
+        no_core_id_candidate = candidate[1:]
+        partial_objective_domination = (no_core_id_candidate < no_core_id_frontier)
+        dominated_indexes = partial_objective_domination.all(axis=1)
+
+        try:
+            dominated = np.vstack((dominated, frontier[dominated_indexes]))
+        except UnboundLocalError:
+            dominated = frontier[dominated_indexes]
+
+        frontier = frontier[~dominated_indexes]
+        no_core_id_frontier = no_core_id_frontier[~dominated_indexes]
+
+        will_go = partial_objective_domination.any(axis=1).all()
+
+        if will_go:
+            frontier = np.vstack((frontier, candidate))
+            no_core_id_frontier = np.vstack((no_core_id_frontier, no_core_id_candidate))
+        else:
+            dominated = np.vstack((dominated, candidate))
+
+    return frontier,dominated
+
+
+
+
+
+
+
+
 
 
 
 if __name__ == "__main__":
-
+    import time
     data = get_data()
 
     # data = data[:, 1:]
 
 
-    print(get_pareto_fittest(data, 9))
+    t0 = time.time()
+
+    a = fast_non_dominated_sort(data)
+
+    t1 = time.time()
+
+    total = t1 - t0
+    print(total)
+
+    t0 = time.time()
+    b = get_frontier(data)
+    t1 = time.time()
+    total = t1 - t0
+    print(total)
+
+    # print(np.isin(a[0],b[0]).all(), np.isin(a[1],b[1]).all())
+    there = True
+
+    for i in a[1][:,0:1]:
+        if i in b[1][:,0:1]:
+            pass
+        else:
+            print(i)
+            there= False
+
+    print(there)
+
+    for i in b[0][:,0:1]:
+        if i in a[0][:,0:1]:
+            pass
+        else:
+            print(i)
+            there= False
+
+    print(there)
+
+
+    # print(a)
+    # print(b)
+
+    # print(get_pareto_fittest(data, 9))
     # print(sumerize_frontier_with_id(data, 6))
 
     # print(get_pareto_fittest(data, 6))

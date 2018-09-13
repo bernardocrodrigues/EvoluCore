@@ -5,6 +5,8 @@ import numpy as np
 
 class librarian(object):
 
+
+
     def __init__(self):
         self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
 
@@ -35,7 +37,7 @@ class librarian(object):
             else:
                 return np.array(cur.execute(query).fetchall())
 
-    def get_core_characteristics(self, id_core: int) -> (int, int, int):
+    def get_core_characteristics(self, id_core: int):
         cur = self.__conn.cursor()
         return cur.execute('''select 
                                      dcache_size, 
@@ -52,10 +54,39 @@ class librarian(object):
                                      setting_branchpredictiontype 
                                      from core where id_core='''+str(id_core)).fetchone()
 
+    def get(self, limit = None):
+        cur = self.__conn.cursor()
+
+        query = '''select 
+                         dcache_size, 
+                         dcache_bursts,                                                
+                         dcache_victim_buf_impl, 
+                         icache_size, 
+                         icache_burstType, 
+                         setting_support31bitdcachebypass, 
+                         dividerType, 
+                         mul_32_impl, 
+                         shift_rot_impl, 
+                         mul_64_impl, 
+                         setting_bhtPtrSz, 
+                         setting_branchpredictiontype,
+                         adpcm, 
+                         alm,
+                         memory,
+                         ram
+                    from core'''
+        if limit != None:
+            aux = np.array(cur.execute(query).fetchmany(limit))
+            return (aux[:,:12], aux[:,12:])
+        else:
+            aux = np.array(cur.execute(query).fetchall())
+            return (aux[:, :12], aux[:, 12:])
+
 if __name__ == "__main__":
 
     lib = librarian()
 
-    print(lib.get_benchmark_data(limit=5, metrics=["alm, memory"]))
-    print(lib.get_core_characteristics(10))
+    # print(lib.get_benchmark_data(limit=5, metrics=["alm, memory"]))
+    # print(lib.get_core_characteristics(10))
 
+    print(lib.get(10))
