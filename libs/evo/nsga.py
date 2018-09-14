@@ -58,11 +58,15 @@ class nsga(object):
         # objective_frontiers = np.vstack(objective_frontiers)
 
         parents = self.__binary_tournament(traits)
-
+        children = []
         for parent_a, parent_b in parents:
             if np.random.uniform(0,1) < self.cross_over_ratio:
                 child_a, child_b = self.__crossover(parent_a, parent_b)
-                self.__mutation(child_a)
+                child_a = self.__mutation(child_a)
+                child_b = self.__mutation(child_b)
+                children.append(child_a)
+                children.append(child_b)
+
 
 
 
@@ -93,11 +97,11 @@ class nsga(object):
 
     def __mutation(self, traits):
 
-        # mutation_rate = 1/traits.size
         if np.random.uniform(0, 1) < self.mutation_rate:
-            print('sim')
+
+            return factory.factory.randomize_genes(traits, [np.random.randint(0, self.num_traits)])
         else:
-            print('não')
+            return traits
 
 
 

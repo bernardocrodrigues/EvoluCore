@@ -30,19 +30,30 @@ class factory(object):
                   'setting_branchpredictiontype']
 
     @classmethod
-    def randomize_genes(cls,traits, genes):
-        for gene in genes:
+    def randomize_genes(cls, traits, genes):
 
-            gene_size = len(cls.genes_pool[gene])
-            new_gene = cls.genes_pool[gene][np.random.randint(0, gene_size)]
+        valid = False
 
-
-            while new_gene == traits[gene]:
+        while not valid:
+            for gene in genes:
+                gene_size = len(cls.genes_pool[gene])
                 new_gene = cls.genes_pool[gene][np.random.randint(0, gene_size)]
-
-            traits[gene] = new_gene
+                while new_gene == traits[gene]:
+                    new_gene = cls.genes_pool[gene][np.random.randint(0, gene_size)]
+                aux = traits
+                aux[gene] = new_gene
+                if cls.validate_core(aux):
+                    valid = True
+                    traits = aux
 
         return traits
+
+    @staticmethod
+    def validate_core(traits):
+        if traits[9] == '1' and (traits[7] == '1' or traits[7] == '0'):
+            print('aa')
+            return False
+        return True
 
 
 
@@ -50,4 +61,4 @@ if __name__ == '__main__':
 
     a = ['8192', 'false', 'reg', '0', 'Sequential', 'true', 'no_div', '3', '1', '0', '13', 'Dynamic']
 
-    print(factory.randomize_genes(a, [1,2,3]))
+    print(factory.randomize_genes(a, [9,7]))
