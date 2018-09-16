@@ -2,6 +2,8 @@
 import numpy as np
 import random
 import libs.coreFactory.coreFactory as factory
+import libs.eidetic.eidetic as eye
+import libs.paretoFrontier as pf
 
 class nsga(object):
 
@@ -25,8 +27,8 @@ class nsga(object):
 
         if traits.shape[0] != self.population_size or objectives.shape[0] != self.population_size:
             raise self.InvalidPopulationSize
-        if traits.shape[0] % 2  != 0:
-            raise self.InvalidPopulationSize
+        if traits.shape[0] % 2 != 0:
+            raise self.InvalidPopulationSize("Not even")
         if traits.shape[1] != self.num_traits:
             raise self.InvalidTraitsSize
         if objectives.shape[1] != self.num_objectives:
@@ -34,48 +36,24 @@ class nsga(object):
 
     def insert_initial_population(self, traits, objectives):
 
-        self.__check_population(traits,objectives)
+        self.__check_population(traits, objectives)
 
+        frontier_trait, frontier_objectives = self.__get_frontiers(traits, objectives)
+        # print(frontier_objectives)
 
+        # eye.plot_3D_no_id(frontier_objectives)
 
-        # (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits,objectives)
-        #
-        # trait_frontiers = [aux_trait_frontier]
-        # objective_frontiers = [aux_objective_frontier]
-        # rank = np.ones(trait_frontiers[0].shape[0])
-        #
-        # rank_index = 2
-        #
-        # while aux_dominated_traits.shape[0] != 0:
-        #
-        #     (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits, aux_dominated_objectives)
-        #     trait_frontiers.append(aux_trait_frontier)
-        #     objective_frontiers.append(aux_objective_frontier)
-        #     rank = np.concatenate((rank, rank_index*np.ones(aux_trait_frontier.shape[0])))
-        #     rank_index += 1
-        #
-        # trait_frontiers = np.vstack(trait_frontiers)
-        # objective_frontiers = np.vstack(objective_frontiers)
+        pf.validate_frontier_set(frontier_objectives)
 
-        parents = self.__binary_tournament(traits)
-        children = []
-        for parent_a, parent_b in parents:
-            if np.random.uniform(0,1) < self.cross_over_ratio:
-                child_a, child_b = self.__crossover(parent_a, parent_b)
-                child_a = self.__mutation(child_a)
-                child_b = self.__mutation(child_b)
-                children.append(child_a)
-                children.append(child_b)
-
-
-
-
-
-
-
-
-
-
+        # parents = self.__binary_tournament(traits)
+        # children = []
+        # for parent_a, parent_b in parents:
+        #     if np.random.uniform(0,1) < self.cross_over_ratio:
+        #         child_a, child_b = self.__crossover(parent_a, parent_b)
+        #         child_a = self.__mutation(child_a)
+        #         child_b = self.__mutation(child_b)
+        #         children.append(child_a)
+        #         children.append(child_b)
 
     def __binary_tournament(self, traits):
 
@@ -102,19 +80,6 @@ class nsga(object):
             return factory.factory.randomize_genes(traits, [np.random.randint(0, self.num_traits)])
         else:
             return traits
-
-
-
-
-
-    def get_current_population(self):
-        pass
-
-    def iterate_population(self, population : np.array):
-        pass
-
-        # print(self.__fast_non_dominated_sort(population))
-
 
     def __fast_non_dominated_sort(self, trait_space: np.array, objective_space: np.array):
 
@@ -145,9 +110,59 @@ class nsga(object):
                 dominated_traits = np.vstack((dominated_traits, trait_candidate))
                 dominated_objectives = np.vstack((dominated_objectives, objective_candidate))
         try:
-            return (trait_frontier, objective_frontier), (dominated_traits,dominated_objectives)
+            return (trait_frontier, objective_frontier), (dominated_traits, dominated_objectives)
         except UnboundLocalError:
             return (trait_frontier, objective_frontier), (np.array([]), np.array([]))
+
+    def __get_stacked_frontiers(self, traits, objectives):
+
+        (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits,objectives)
+
+        trait_frontiers = [aux_trait_frontier]
+        objective_frontiers = [aux_objective_frontier]
+        rank = np.ones(trait_frontiers[0].shape[0])
+
+        print(aux_trait_frontier.shape[0])
+
+        rank_index = 2
+        a = 1
+        while aux_dominated_traits.shape[0] != 0:
+
+            a+=1
+            (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits, aux_dominated_objectives)
+            trait_frontiers.append(aux_trait_frontier)
+            objective_frontiers.append(aux_objective_frontier)
+            rank = np.concatenate((rank, rank_index*np.ones(aux_trait_frontier.shape[0])))
+            rank_index += 1
+            print(aux_trait_frontier.shape[0])
+
+        # trait_frontiers = np.vstack(trait_frontiers)
+        # objective_frontiers = np.vstack(objective_frontiers)
+        # print(a)
+        return np.vstack(trait_frontiers), np.vstack(objective_frontiers), rank
+
+    def __get_frontiers(self, traits, objectives):
+
+        (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits,objectives)
+
+        trait_frontiers = [aux_trait_frontier]
+        objective_frontiers = [aux_objective_frontier]
+
+        while aux_dominated_traits.shape[0] != 0:
+
+            (aux_trait_frontier, aux_objective_frontier), (aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits, aux_dominated_objectives)
+            trait_frontiers.append(aux_trait_frontier)
+            objective_frontiers.append(aux_objective_frontier)
+
+        return trait_frontiers, objective_frontiers
+
+    def get_current_population(self):
+        pass
+
+    def iterate_population(self, population : np.array):
+        pass
+
+
 
 
 
@@ -157,10 +172,10 @@ if __name__ == '__main__':
 
     import libs.librarian.librarian as l
 
-    size = 10
+    size = 1000
     cross_over_ratio = 0.9
     num_traits = 12
-    num_objectives = 4
+    num_objectives = 3
 
     lib = l.librarian()
     traits, objectives = lib.get(size)

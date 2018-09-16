@@ -61,12 +61,10 @@ class eidetic(object):
         plt.clf()
 
     @staticmethod
-    def plot_3D(data: list, types=None, file="output.png", labels=False, title="", xlabel="", ylabel="", zlabel="",barlabel=""):
+    def plot_3D_with_colorbar(data: list, types=None, file="output.png", labels=False, title="", xlabel="", ylabel="", zlabel="",barlabel=""):
 
         traces = []
         marker = [ "circle" ,  "cross"]
-
-
 
         for idx, datum in enumerate(data):
             if idx == 0:
@@ -113,6 +111,157 @@ class eidetic(object):
 
                 )
                     ))
+
+        layout = go.Layout(
+            margin=dict(
+                l=0,
+                r=0,
+                b=0,
+                t=0
+            ),
+            title=title,
+            scene=dict(
+                xaxis=dict(
+                    title=xlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                yaxis=dict(
+                    title=ylabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                zaxis=dict(
+                    title=zlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                )
+            )
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        py.plot(fig, filename='simple-3d-scatter')
+
+
+
+
+        # print(data[:,0])
+
+        # for datum in data:
+        #     print(datum)
+        #     traces.append()
+
+    @staticmethod
+    def plot_3D(data: list, types=None, file="output.png", labels=False, title="", xlabel="", ylabel="", zlabel="",barlabel=""):
+
+        traces = []
+
+        for idx, datum in enumerate(data):
+            traces.append(
+                go.Scatter3d(
+                    # text=datum[:, (datum.shape[1]-1)],
+                    x=datum[:,1],
+                    y=datum[:,2],
+                    z=datum[:,3],
+                    mode='markers',
+
+                    marker=dict(
+                        # colorbar = dict(thickness=50, x=0.75, len=0.5, title=barlabel),
+                        # symbol = marker[idx],
+                        size=5,
+                        # color=datum[:, (datum.shape[1]-1)],  # set color to an array/list of desired values
+                        colorscale='Viridis',
+                        line=dict(
+                            color='black',
+                            width=0.2
+                        ),
+                        opacity=0.7
+                    )
+                ))
+
+
+        layout = go.Layout(
+            margin=dict(
+                l=0,
+                r=0,
+                b=0,
+                t=0
+            ),
+            title=title,
+            scene=dict(
+                xaxis=dict(
+                    title=xlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                yaxis=dict(
+                    title=ylabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                ),
+                zaxis=dict(
+                    title=zlabel,
+                    titlefont=dict(
+                        family='Courier New, monospace',
+                        size=18,
+                        color='#7f7f7f'
+                    )
+                )
+            )
+        )
+        fig = go.Figure(data=traces, layout=layout)
+        py.plot(fig, filename='simple-3d-scatter')
+
+
+
+
+        # print(data[:,0])
+
+        # for datum in data:
+        #     print(datum)
+        #     traces.append()
+
+    @staticmethod
+    def plot_3D_no_id(data: list, types=None, file="output.png", labels=False, title="", xlabel="", ylabel="", zlabel="",barlabel=""):
+
+        traces = []
+        marker = [ "circle" ,  "cross"]
+
+        for idx, datum in enumerate(data):
+
+            traces.append(
+                go.Scatter3d(
+                    # text=datum[:, (datum.shape[1]-1)],
+                    x=datum[:,0],
+                    y=datum[:,1],
+                    z=datum[:,2],
+                    mode='markers',
+
+                    marker=dict(
+                        colorbar = dict(thickness=50, x=0.75, len=0.5, title=barlabel),
+                        size=5,
+                        line=dict(
+                            color='black',
+                            width=0.2
+                        ),
+                        opacity=0.7
+                    )
+                ))
+
 
         layout = go.Layout(
             margin=dict(
@@ -233,23 +382,26 @@ if __name__ == "__main__":
     import libs.paretoFrontier.paretoFrontier as pf
     lib_ = libs.librarian.librarian.librarian()
 
-    data = lib_.get_benchmark_data(benchmark="sobel", metrics=["alm", "memory", "ram"])
+    data = lib_.get_benchmark_data(benchmark="adpcm", metrics=["alm", "memory"])
     # data = lib_.get_data(20)
 
-    frontiers, _ = pf.get_frontiers(data, 2)
+    frontiers, a = pf.get_frontiers(data, 100)
+
+    # eidetic.plot_3D(frontiers)
+
+
 
     test = frontiers[0][:, 1:]
     test2 = frontiers[1][:, 1:]
     # print(test)
 
-    # result = []
-    # for i, item in enumerate(test):
-    #     previous_slice = test[:i, :]
-    #     next_slice = test[i + 1:, :]
-    #     candidate_less_space = np.vstack((previous_slice, next_slice))
-    #     # print(item)
-    #     result.append((item < candidate_less_space).all(axis=1).all())
-    # print(any(result))
+    result = []
+    for i, item in enumerate(test):
+        previous_slice = test[:i, :]
+        next_slice = test[i + 1:, :]
+        candidate_less_space = np.vstack((previous_slice, next_slice))
+        result.append((item < candidate_less_space).all(axis=1).all())
+    print(any(result))
     #
     # test2 = frontiers[1][:, 1:]
     # # print(test)

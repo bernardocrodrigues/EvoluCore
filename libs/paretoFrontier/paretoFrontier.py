@@ -5,7 +5,7 @@ from functools import reduce
 def get_data():
     conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
     cur = conn.cursor()
-    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(1000))
+    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(10))
 
 def get_strongly_dominated(reference: np.array, space: np.array):
 
@@ -276,7 +276,46 @@ def fast_non_dominated_sort(full_space: np.array):
 
     return frontier,dominated
 
+def validate_frontier_set(frontiers):
 
+
+    for index, frontier in enumerate(frontiers):
+        '''check if elements in each frontier are non dominated among them'''
+        print("Fronteira: {}".format(index))
+        result_1 = []
+        for i, item in enumerate(frontier):
+            # print(item)
+            previous_slice = frontier[:i, :]
+            next_slice = frontier[i + 1:, :]
+            candidate_less_space = np.vstack((previous_slice, next_slice))
+            result_1.append(((item < candidate_less_space).all(axis=1).any()))
+        print(any(result_1))
+
+        '''checks if frontiers are strickly dominat among them'''
+        try:
+            other_frontiers  = frontiers[index+1:]
+
+        except IndexError:
+            pass
+        else:
+            result_2 = []
+            for comp_front in other_frontiers:
+                for element in frontier:
+                    result_2.append((element > comp_front).all(axis=1).any())
+            print(any(result_2))
+
+
+
+    # result = []
+    #
+    # for i, item in enumerate(test):
+    #     previous_slice = test[:i, :]
+    #     next_slice = test[i + 1:, :]
+    #     candidate_less_space = np.vstack((previous_slice, next_slice))
+    #     result.append((item < candidate_less_space).all(axis=1).all())
+    # print(any(result))
+
+    # print(frontiers)
 
 
 
@@ -287,48 +326,65 @@ def fast_non_dominated_sort(full_space: np.array):
 
 
 if __name__ == "__main__":
-    import time
-    data = get_data()
+    # import time
+    # data = get_data()
+    import libs.librarian.librarian
+    lib_ = libs.librarian.librarian.librarian()
+    data = lib_.get_benchmark_data(benchmark="adpcm", metrics=["alm", "memory"])
 
-    # data = data[:, 1:]
+
+    frontiers, dominated = get_frontiers(data,100)
+
+    fronts = []
+
+    for i in frontiers:
+        fronts.append(i[:,1:])
+
+    # print(fronts
+
+    validate_frontier_set(fronts)
 
 
-    t0 = time.time()
-
-    a = fast_non_dominated_sort(data)
-
-    t1 = time.time()
-
-    total = t1 - t0
-    print(total)
-
-    t0 = time.time()
-    b = get_frontier(data)
-    t1 = time.time()
-    total = t1 - t0
-    print(total)
-
-    # print(np.isin(a[0],b[0]).all(), np.isin(a[1],b[1]).all())
-    there = True
-
-    for i in a[1][:,0:1]:
-        if i in b[1][:,0:1]:
-            pass
-        else:
-            print(i)
-            there= False
-
-    print(there)
-
-    for i in b[0][:,0:1]:
-        if i in a[0][:,0:1]:
-            pass
-        else:
-            print(i)
-            there= False
-
-    print(there)
-
+    #
+    # # data = data[:, 1:]
+    #
+    #
+    # t0 = time.time()
+    #
+    # a = fast_non_dominated_sort(data)
+    #
+    # t1 = time.time()
+    #
+    # total = t1 - t0
+    # print(total)
+    #
+    # t0 = time.time()
+    # b = get_frontier(data)
+    # t1 = time.time()
+    # total = t1 - t0
+    # print(total)
+    #
+    # # print(np.isin(a[0],b[0]).all(), np.isin(a[1],b[1]).all())
+    # there = True
+    #
+    # for i in a[1][:,0:1]:
+    #     if i in b[1][:,0:1]:
+    #         pass
+    #     else:
+    #         print(i)
+    #         there= False
+    #
+    # print(there)
+    #
+    # for i in b[0][:,0:1]:
+    #     if i in a[0][:,0:1]:
+    #         pass
+    #     else:
+    #         print(i)
+    #         there= False
+    #
+    # print(there)
+    #
 
     # print(a)
     # print(b)

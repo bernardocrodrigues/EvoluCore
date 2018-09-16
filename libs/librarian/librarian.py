@@ -56,7 +56,7 @@ class librarian(object):
 
     def get(self, limit = None):
         cur = self.__conn.cursor()
-
+#TODO: POR RAM DE VOLTA NA BUSCA
         query = '''select 
                          dcache_size, 
                          dcache_bursts,                                                
@@ -72,8 +72,7 @@ class librarian(object):
                          setting_branchpredictiontype,
                          adpcm, 
                          alm,
-                         memory,
-                         ram
+                         memory
                     from core'''
         if limit != None:
             aux = np.array(cur.execute(query).fetchmany(limit))
