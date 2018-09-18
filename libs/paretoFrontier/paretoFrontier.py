@@ -5,7 +5,7 @@ from functools import reduce
 def get_data():
     conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
     cur = conn.cursor()
-    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(10))
+    return np.array(cur.execute("select id_core, adpcm, alm from core").fetchmany(1000))
 
 def get_strongly_dominated(reference: np.array, space: np.array):
 
@@ -277,8 +277,6 @@ def fast_non_dominated_sort(full_space: np.array):
     return frontier,dominated
 
 def validate_frontier_set(frontiers):
-
-
     for index, frontier in enumerate(frontiers):
         '''check if elements in each frontier are non dominated among them'''
         print("Fronteira: {}".format(index))
@@ -293,15 +291,17 @@ def validate_frontier_set(frontiers):
 
         '''checks if frontiers are strickly dominat among them'''
         try:
-            other_frontiers  = frontiers[index+1:]
-
+            other_frontiers = frontiers[index+1:]
         except IndexError:
             pass
         else:
             result_2 = []
             for comp_front in other_frontiers:
                 for element in frontier:
-                    result_2.append((element > comp_front).all(axis=1).any())
+                    result_compare = element > comp_front
+                    stack_result = result_compare.all(axis=1)
+                    final_result =  stack_result.any()
+                    result_2.append(final_result)
             print(any(result_2))
 
 
@@ -333,13 +333,18 @@ if __name__ == "__main__":
     data = lib_.get_benchmark_data(benchmark="adpcm", metrics=["alm", "memory"])
 
 
-    frontiers, dominated = get_frontiers(data,100)
+    frontiers, dominated = get_frontiers(data, 1000)
 
     fronts = []
 
     for i in frontiers:
         fronts.append(i[:,1:])
 
+    # print(fronts)
+
+    # fronts[0] = np.vstack((np.array([1000000000000,1000000000000]), fronts[0]))
+
+    # print(fronts)
     # print(fronts
 
     validate_frontier_set(fronts)

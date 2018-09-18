@@ -34,8 +34,8 @@ class eidetic(object):
         grouped = np.vstack(grouped)
 
         sns_plot = sns.scatterplot(
-            x= grouped[:,1],
-            y= grouped[:,2],
+            x= grouped[:,0],
+            y= grouped[:,1],
             hue=hue,
             legend= "brief",
             palette=sns.color_palette( n_colors=colors),
@@ -44,8 +44,8 @@ class eidetic(object):
         if labels:
             for datum in data:
                 for k in datum:
-                    sns_plot.text(k[1],
-                                  k[2],
+                    sns_plot.text(k[0],
+                                  k[1],
                                   "{0:.0f}".format(k[0]),
                                   family='sans-serif',
                                   textcoords='offset points',

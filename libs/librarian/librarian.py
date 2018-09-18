@@ -56,7 +56,7 @@ class librarian(object):
 
     def get(self, limit = None):
         cur = self.__conn.cursor()
-#TODO: POR RAM DE VOLTA NA BUSCA
+#TODO: POR RAM, memory DE VOLTA NA BUSCA
         query = '''select 
                          dcache_size, 
                          dcache_bursts,                                                
@@ -71,15 +71,15 @@ class librarian(object):
                          setting_bhtPtrSz, 
                          setting_branchpredictiontype,
                          adpcm, 
-                         alm,
-                         memory
+                         alm
                     from core'''
         if limit != None:
             aux = np.array(cur.execute(query).fetchmany(limit))
-            return (aux[:,:12], aux[:,12:])
+            # aux = cur.execute(query).fetchmany(limit)
+            return aux[:, :12], aux[:, 12:].astype(float)
         else:
             aux = np.array(cur.execute(query).fetchall())
-            return (aux[:, :12], aux[:, 12:])
+            return aux[:, :12], aux[:, 12:].astype(float)
 
 if __name__ == "__main__":
 
