@@ -51,14 +51,41 @@ class factory(object):
     @staticmethod
     def validate_core(traits):
         if traits[9] == '1' and (traits[7] == '1' or traits[7] == '0'):
-            print('aa')
             return False
         return True
+
+    @classmethod
+    def generate_random_cores(cls, num: int):
+
+        cores = []
+
+        while len(cores) < num:
+            new_core = ()
+            for gene in cls.genes_pool:
+                new_core += (gene[np.random.randint(0, len(gene))],)
+            if factory.validate_core(new_core) and not(new_core in cores):
+                cores.append(new_core)
+
+        return np.array(cores)
+
+    @classmethod
+    def format_core_dict(cls, core):
+
+        aux = {}
+
+        for gene, gene_name in zip(core, cls.gene_names):
+            aux[gene_name] = gene
+
+        return aux
+
+
+
+
+
+
 
 
 
 if __name__ == '__main__':
 
-    a = ['8192', 'false', 'reg', '0', 'Sequential', 'true', 'no_div', '3', '1', '0', '13', 'Dynamic']
-
-    print(factory.randomize_genes(a, [9,7]))
+    print(factory.generate_random_cores(10))

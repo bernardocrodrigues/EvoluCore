@@ -6,6 +6,7 @@ import parse
 import xmlParse
 from libs.millenium.millenium import db
 import traceback
+import libs.coreFactory.coreFactory as fac
 
 
 class log:
@@ -65,7 +66,353 @@ class log:
         print(nums)
         print(cls.ENDC)
 
+class nourish(Process):
 
+    def __init__(self, rootDir, prefix, referenceDir, population, output, key_start, kernel):
+
+        Process.__init__(self)
+        self.__rootDir = rootDir
+        self.__workingDir = rootDir
+        self.__current = None
+        self.__pid = None
+        self.__prefix = prefix
+        self.__referenceDir = referenceDir
+
+        self.__population = population
+        self.__key_start = key_start
+        self.__output = output
+        self.__kernel = kernel
+
+        baseFile = "/home/bcrodrigues/Dropbox/tcc/script/base/qsys/baseOriginal.qsys"
+        targetDir = "/home/bcrodrigues/tcc/qsys/"
+
+        self.__qFac = xmlParse.qsysFactory(baseFile, targetDir)
+
+    def _setupFolder(self):
+        try:
+            if os.path.isdir(self.__workingDir):
+                shutil.rmtree(self.__workingDir)
+                os.makedirs(self.__workingDir)
+            else:
+                os.makedirs(self.__workingDir)
+        except OSError:
+            print('Erro no setup das pastas')
+            exit(1)
+
+    def _populateQsys(self):
+
+        code = subprocess.run(["qsys-generate", "--synthesis=VHDL", self.__rootDir + '/qsys/' + self.__prefix + str(self.actual_idx) + ".qsys", "--output-directory=" + self.__rootDir + '/' + str(
+            self.actual_idx)], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+
+        if code.returncode != 0:
+            raise AssertionError
+
+    def _fixTopDesignName(self):
+
+        with open(self.__workingDir + 'base.qsf', 'r') as f:
+            lines = f.readlines()
+
+        for x, line in enumerate(lines):
+            if 'TOP_LEVEL_ENTITY' in line:
+                lines[x] = 'set_global_assignment -name TOP_LEVEL_ENTITY '+self.__prefix+str(self.actual_idx)+'\n'
+            if 'QIP_FILE' in line:
+                lines[x] = 'set_global_assignment -name QIP_FILE synthesis/'+self.__prefix+str(self.actual_idx)+'.qip\n'
+
+        with open(self.__workingDir + 'base.qsf', 'w') as f:
+            for line in lines:
+                f.write(line)
+
+    def _compileQuartus(self):
+
+        code = subprocess.run(["cp", "-a", self.__referenceDir+"quartus/.", self.__workingDir])
+        if code.returncode != 0:
+            raise Exception('Erro na copia dos arquivos quartus')
+
+
+        self._fixTopDesignName()
+
+        code = subprocess.run(["quartus_sh", "--flow", "compile", self.__workingDir+"base.qpf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        if code.returncode != 0:
+            raise Exception('Erro na compilação do quartus')
+
+    def _compileSoftware(self, benchmarks):
+
+        os.makedirs(self.__workingDir+'/software')
+
+        code = subprocess.run(["nios2-bsp", "hal", self.__workingDir+'/software/bsp', self.__rootDir + '/qsys/' + self.__prefix + str(self.actual_idx)+'.sopcinfo', "--script=" + self.__referenceDir+ "/bsp/parameters.tcl"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+        if code.returncode != 0:
+            raise Exception('Erro no BSP')
+
+
+        for benchmark in benchmarks:
+
+            code = subprocess.run(["nios2-app-generate-makefile", "--bsp-dir="+self.__workingDir+'/software/bsp', "--src-rdir="+self.__referenceDir +"software/"+benchmark+"/", "--app-dir=" + self.__workingDir+'/software/'+benchmark+"/", "--elf-name", "code.elf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            if code.returncode != 0:
+                raise Exception('Erro no makefile')
+
+
+            code = subprocess.run(["make", "-C", self.__workingDir+'/software/'+benchmark+'/'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+            if code.returncode != 0:
+                raise Exception('Erro no make')
+
+    def _cleanUp(self):
+        try:
+            shutil.rmtree(self.__workingDir)
+            os.remove(self.__rootDir+'/qsys/q'+str(self.__current['id_core'])+'.qsys')
+            os.remove(self.__rootDir+'/qsys/q'+str(self.__current['id_core'])+'.sopcinfo')
+        except Exception:
+            log.bench_error_message(self.__pid,self.__current['id_core'], "ERROR! \n" + traceback.format_exc())
+
+    def run(self):
+
+        self.__pid = os.getpid()
+
+        for idx, individual in enumerate(self.__population):
+            # print(fac.factory.format_core_dict(individual))
+            self.actual_idx = idx + self.__key_start
+
+            log.begin_task(self.__pid, str(self.actual_idx), "Got core " + str(self.actual_idx))
+
+
+            self.__qFac.modifyNios(fac.factory.format_core_dict(individual))
+            self.__qFac.writeCurrentQsys('q' + str(self.actual_idx) + '.qsys')
+            self.__qFac.resetCurrentQsys()
+
+            self.__workingDir = self.__rootDir + '/' + str(self.actual_idx) + '/'
+            self._setupFolder()
+            log.end_task(self.__pid, str(self.actual_idx), "QSYS files and folders")
+
+            log.begin_task(self.__pid, str(self.actual_idx), "Compiling QSYS")
+            self._populateQsys()
+            log.end_task(self.__pid, str(self.actual_idx), "Compiling QSYS")
+
+            log.begin_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
+            self._compileQuartus()
+            log.end_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
+
+            log.begin_task(self.__pid, str(self.actual_idx), "Compiling Software")
+            self._compileSoftware(self.__kernel)
+            log.end_task(self.__pid, str(self.actual_idx), "Compiling Software")
+            #
+
+            log.success(self.__pid, str(self.actual_idx))
+
+            self.__output.put((self.actual_idx, individual))
+
+            #
+            #     except Exception:
+            #         log.error_message(self.__pid, str(self.__current['id_core']), "ERROR! \n" + traceback.format_exc())
+
+        # self.__db.give_back(self.__current['id_core'])
+        # self._cleanUp()
+        log.exit_message(self.__pid)
+
+class colosseum(Process):
+
+    def __init__(self, rootDir, prefix, referenceDir, cable, input, result, cleanUp, kernel):
+
+        Process.__init__(self)
+        self.__rootDir = rootDir
+        self.__workingDir = rootDir
+        self.__current = None
+        self.__pid = None
+        self.__prefix = prefix
+        self.__referenceDir = referenceDir
+        self.__cable = cable
+        self.__cleanUp =cleanUp
+        self.__result = result
+        self.__input = input
+        self.__running = Value('d', 1)
+        self.__kernel = kernel
+
+
+    def _configureBoard(self):
+
+        success = False
+        while not success:
+
+            p = subprocess.Popen("quartus_pgm -c "+str(self.__cable) + " -z --mode=JTAG --operation=\"p;" + self.__workingDir +"output_files/base_time_limited.sof@2\"",stdout=subprocess.PIPE, shell=True)
+
+            for line in iter(p.stdout.readline, b''):
+                string = line.decode("utf-8")
+
+                if "Configuration succeeded" in string:
+                    success = True
+                    subprocess.run(["kill", str(p.pid)])
+                    break
+
+                if "Operation failed" in string:
+                    subprocess.run(["kill", str(p.pid)])
+                    subprocess.run(["killall", "jtagd"])
+                    break
+
+                if 'does not exist or can\'t be read' in string:
+                    raise FileNotFoundError
+
+    def _transferCode(self, benchmark):
+
+        confiredProperly = False
+        while not confiredProperly:
+            returnCode = -1
+            retry = -1
+
+            while returnCode != 0:
+                code = subprocess.run(["nios2-download", "-c", str(self.__cable), "-r", "-g", self.__workingDir + "/software/"+benchmark+"/code.elf"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                returnCode = code.returncode
+                retry += 1
+                if retry > 5:
+                    break
+
+            if returnCode != 0:
+                subprocess.run(["killall", "jtagd"])
+                self._configureBoard()
+            else:
+                subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                confiredProperly = True
+
+    def _benchmark(self, benchmark):
+
+        retry = 3
+
+        while True:
+
+            p = subprocess.Popen('nios2-terminal -c '+str(self.__cable)+' -o 4', stdout=subprocess.PIPE, preexec_fn=os.setsid, shell=True)
+            aux = []
+            for x in range(10):
+                for line in iter(p.stdout.readline, b''):
+                    try:
+                        string = line.decode("utf-8")
+                        aux.append(int(string))
+                    except:
+                        pass
+                    else:
+                        break
+            try:
+                result = reduce(lambda x, y: x + y, aux[4:]) / len(aux[4:])
+                log.bench_numbers(aux+[result])
+            except:
+                if retry > 0:
+                    subprocess.run(["nios2-download", "-r", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL,
+                                   stdout=subprocess.DEVNULL)
+                    subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+                    # subprocess.run(["kill", str(p.pid)])
+                    retry -= 1
+                else:
+                    subprocess.run(["kill", str(p.pid)])
+                    self._configureBoard()
+                    self._transferCode(benchmark)
+                    retry = 3
+            else:
+                subprocess.run(["kill", str(p.pid)])
+                return result, aux
+
+    def _getUsageData(self):
+
+        with open(self.__workingDir + "output_files/base.fit.summary", 'r') as f:
+
+            format_string_memory = 'Total block memory bits : {} / {} ( {} % )'
+            format_string_ram = 'Total RAM Blocks : {} / {} ( {} % )'
+            format_string_alm = 'Logic utilization (in ALMs) : {} / {} ( {} % )'
+
+            output = f.read().splitlines()
+
+            result = []
+
+            for line in output:
+                if 'ALMs' in line:
+                    parsed = parse.parse(format_string_alm, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result.append(used)
+
+                if 'block memory bits' in line:
+                    parsed = parse.parse(format_string_memory, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result.append(used)
+
+                if 'Total RAM Blocks' in line:
+                    parsed = parse.parse(format_string_ram, line)
+
+                    used = int(parsed[0].replace(',', ''))
+                    total = int(parsed[1].replace(',', ''))
+
+                    result.append(used)
+
+            return result
+
+    def _cleanUp(self):
+        try:
+            shutil.rmtree(self.__workingDir)
+            os.remove(self.__rootDir+'/qsys/q'+self.actual_idx+'.qsys')
+            os.remove(self.__rootDir+'/qsys/q'+self.actual_idx+'.sopcinfo')
+        except Exception:
+            log.bench_error_message(self.__pid, self.actual_idx, "ERROR! \n" + traceback.format_exc())
+
+    def shutdown(self):
+        self.__running.value = 0
+
+    def run(self):
+        self.__pid = os.getpid()
+        while self.__running.value:
+            try:
+                self.__current = self.__input.get_nowait()
+            except Exception:
+                time.sleep(1)
+            else:
+                self.actual_idx = str(self.__current[0])
+
+                log.bench_begin_task(self.__pid, self.actual_idx, "Got core " + self.actual_idx)
+                self.__workingDir = self.__rootDir + '/' + self.actual_idx + '/'
+
+                try:
+                    log.bench_begin_task(self.__pid, self.actual_idx, "Configuring Board")
+                    self._configureBoard()
+                    log.bench_end_task(self.__pid, self.actual_idx, "Configuring Board")
+                except FileNotFoundError:
+                    log.error_message(self.__pid, self.actual_idx, "ERROR! Invalid Core")
+                    self.__result.put((self.__current[1]), -1)
+                except Exception:
+                    log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
+                else:
+
+                    log.bench_begin_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
+                    result = self._getUsageData()
+                    # result['id'] = int(self.actual_idx)
+                    log.bench_end_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
+
+                    log.bench_begin_task(self.__pid, self.actual_idx, "Benchmarking")
+                    for benchmark in self.__kernel:
+
+                        aux = []
+
+                        log.bench_begin_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
+                        self._transferCode(benchmark)
+                        log.bench_end_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
+
+                        log.bench_begin_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
+                        media, times = self._benchmark(benchmark)
+                        log.bench_end_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
+
+                        aux.append(media)
+
+                        result = aux + result
+
+                    # print((self.__current[1], tuple(result)))
+                    self.__result.put((self.__current[1], tuple(result)))
+
+                    if self.__cleanUp:
+                        self._cleanUp()
+                        log.bench_end_task(self.__pid, self.actual_idx, "Cleaning up ")
+
+                log.bench_end_task(self.__pid,  self.actual_idx, "Benchmarking")
+
+        log.bench_exit_message(self.__pid)
 
 class Generator(Process):
 
@@ -521,112 +868,89 @@ class TestBench(Process):
 
         log.bench_exit_message(self.__pid)
 
+class nature():
+
+    def __init__(self, kernel):
+
+        self.target = "/home/bcrodrigues/tcc/"
+        self.base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
+        self.result = Queue()
+        self.interface = Queue()
+        self.prefix = 'q'
+        self.kernel = kernel
+
+    def life(self, population):
+
+        step = int(population.shape[0]/4)
+
+        gen1 = nourish(self.target, self.prefix, self.base, population[0:step], self.interface, 0, self.kernel)
+        gen2 = nourish(self.target, self.prefix, self.base, population[step:step*2], self.interface, step, self.kernel)
+        gen3 = nourish(self.target, self.prefix, self.base, population[step*2:step*3], self.interface,step*2, self.kernel)
+        gen4 = nourish(self.target, self.prefix, self.base, population[step*3:], self.interface, step*3, self.kernel)
+
+        gen1.start()
+        gen2.start()
+        gen3.start()
+        gen4.start()
+
+        gen1.join()
+        gen2.join()
+        gen3.join()
+        gen4.join()
+
+        # self.interface.put((0,'a'))
+        # self.interface.put((1,'a'))
+        # self.interface.put((2,'a'))
+        # self.interface.put((3,'a'))
+
+
+        arena1 = colosseum(self.target, self.prefix, self.base, 1, self.interface, self.result,  True, self.kernel)
+        arena2 = colosseum(self.target, self.prefix, self.base, 2, self.interface, self.result,  True, self.kernel)
+
+        arena1.start()
+        arena2.start()
+
+
+        traits = []
+        objectives = []
+
+        while len(traits) < population.shape[0]:
+            aux = self.result.get()
+            traits.append(aux[0])
+            objectives.append(aux[1])
+
+
+        print(traits)
+
+        print('\n\n')
+
+        print(objectives)
+
+        arena1.shutdown()
+        arena2.shutdown()
+
+
+        # print(finish_line)
+
+        # gen1.start()
+        # gen2.start()
+        # gen3.start()
+        # gen4.start()
+        # ben1.start()
+        # ben2.start()
+
+
+
 
 
 
 if __name__ == '__main__':
 
+    import libs.coreFactory.coreFactory as fac
 
-    target = "/home/bcrodrigues/tcc/"
-    base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
-    toBenchmark = Queue()
-    result = Queue()
-    prefix = 'q'
-    db_ = db()
+    cores = fac.factory.generate_random_cores(4)
+    # print(cores)
 
-    running = Value('b', True)
+    natur = nature(['adpcm'])
 
-    # db_.generate_cores(1000)
-    #
-    gen1 = Generator_on_db(target, prefix, base, toBenchmark, running)
-    gen2 = Generator_on_db(target, prefix, base, toBenchmark, running)
-    gen3 = Generator_on_db(target, prefix, base, toBenchmark, running)
-    gen4 = Generator_on_db(target, prefix, base, toBenchmark, running)
-    # #
-    gen1.start()
-    gen2.start()
-    gen3.start()
-    gen4.start()
-    # #
-    # gen1.join()
-    # gen2.join()
-    # gen3.join()
-    # gen4.join()
-
-
-    #MAIN 2
-
-    ben1 = TestBench(target, prefix, base, 1, result, True, running)
-    ben2 = TestBench(target, prefix, base, 2, result, True, running)
-
-    ben1.start()
-    ben2.start()
-
-    results = []
-
-
-
-    while True:
-        cmd = input()
-        if cmd == 'exit':
-            break
-
-    print("Finishing Tasks...")
-    running.value = False
-    gen1.join()
-    gen2.join()
-    gen3.join()
-    gen4.join()
-    print("Shutting down...")
-    exit(0)
-
-
-
-    # for x in range(1, 5):
-    #     toBenchmark.put(x)
-    # while x < 10:
-    #     try:
-    #         db_.insert_results(result.get_nowait())
-    #         x += 1
-    #     except KeyboardInterrupt:
-    #         running.value = False
-    #         gen1.join()
-    #         gen2.join()
-    #         gen3.join()
-    #         gen4.join()
-    #         exit(0)
-    #     except Exception:
-    #         time.sleep(1)
-
-
-
-
-    #MAIN 1
-    # for x in range(1, 2):
-    #     toCompile.put(x)
-    #
-    # start = time.time()
-    #
-    # gen = Generator(target, toCompile, prefix, base)
-    # gen2 = Generator(target, toCompile, prefix, base)
-    # gen3 = Generator(target, toCompile, prefix, base)
-    # gen4 = Generator(target, toCompile, prefix, base)
-    # gen5 = Generator(target, toCompile, prefix, base)
-    #
-    #
-    # gen.start()
-    # gen2.start()
-    # gen3.start()
-    # gen4.start()
-    # gen5.start()
-    #
-    # gen.join()
-    # gen2.join()
-    # gen3.join()
-    # gen4.join()
-    # gen5.join()
-
-
-    # end = time.time()
-    # print(end - start)
-
+    natur.life(cores)

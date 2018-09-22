@@ -35,9 +35,9 @@ class nsga(object):
 
     def insert_initial_population(self, traits, objectives):
 
-        # self.__check_population(traits, objectives)
-
-        self.__get_fittest(traits, objectives, 500)
+        eye.plot([objectives], file="a.png")
+        fittest_trait, fittest_objective = self.__get_fittest(traits, objectives, 10)
+        eye.plot([fittest_objective], file="b.png")
 
         # print(frontier_objectives)
 
@@ -121,7 +121,7 @@ class nsga(object):
     def __get_stacked_frontiers(self, traits, objectives):
 
         (aux_trait_frontier, aux_objective_frontier), (
-        aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits, objectives)
+            aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits, objectives)
 
         trait_frontiers = [aux_trait_frontier]
         objective_frontiers = [aux_objective_frontier]
@@ -134,8 +134,8 @@ class nsga(object):
         while aux_dominated_traits.shape[0] != 0:
             a += 1
             (aux_trait_frontier, aux_objective_frontier), (
-            aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits,
-                                                                                             aux_dominated_objectives)
+                aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits,
+                                                                                                 aux_dominated_objectives)
             trait_frontiers.append(aux_trait_frontier)
             objective_frontiers.append(aux_objective_frontier)
             rank = np.concatenate((rank, rank_index * np.ones(aux_trait_frontier.shape[0])))
@@ -150,15 +150,15 @@ class nsga(object):
     def __get_frontiers(self, traits, objectives):
 
         (aux_trait_frontier, aux_objective_frontier), (
-        aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits, objectives)
+            aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(traits, objectives)
 
         trait_frontiers = [aux_trait_frontier]
         objective_frontiers = [aux_objective_frontier]
 
         while aux_dominated_traits.shape[0] != 0:
             (aux_trait_frontier, aux_objective_frontier), (
-            aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits,
-                                                                                             aux_dominated_objectives)
+                aux_dominated_traits, aux_dominated_objectives) = self.__fast_non_dominated_sort(aux_dominated_traits,
+                                                                                                 aux_dominated_objectives)
             trait_frontiers.append(aux_trait_frontier)
             objective_frontiers.append(aux_objective_frontier)
 
@@ -170,30 +170,37 @@ class nsga(object):
 
         coverage_idx = 0
         population = frontier_trait[coverage_idx].shape[0]
-        #
-
 
         while population < max_size:
             coverage_idx += 1
             population += frontier_trait[coverage_idx].shape[0]
 
+        if coverage_idx != 0:
+
+            partial_trait = np.vstack(frontier_trait[:coverage_idx])
+            partial_objective = np.vstack(frontier_objectives[:coverage_idx])
+            ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx], frontier_objectives[coverage_idx])
+            delta = max_size - partial_trait.shape[0]
+            fittest_trait = np.vstack((partial_trait, ordered_traits[:delta]))
+            fittest_objective = np.vstack((partial_objective, ordered_objectives[:delta]))
+
+        else:
+            ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx],
+                                                                                  frontier_objectives[coverage_idx])
+
+            delta = max_size - ordered_traits.shape[0]
+            fittest_trait = ordered_traits[:delta]
+            fittest_objective = ordered_objectives[:delta]
 
 
-        print(population, coverage_idx)
+        return fittest_trait, fittest_objective
 
+    def __sort_by_crowding_distance(self, traits: np.array, objectives: np.array):
 
-
-        # while
-
-
-
-
-    def __sort_by_crowding_distance(self, frontier: np.array):
-
-        upper = frontier.shape[0]
+        upper = objectives.shape[0]
         distance = np.zeros(upper)
 
-        for column in frontier.T:
+        for column in objectives.T:
 
             new_order = column.argsort()
             sorted_column = column[new_order]
@@ -207,11 +214,18 @@ class nsga(object):
                     distance[new_order[idx + 1]] += this_distance
 
         edges = distance == -1
-        ordered = frontier[edges]
-        aux = frontier[~edges]
+
+        ordered_objectives = objectives[edges]
+        ordered_traits = traits[edges]
+
+        aux = objectives[~edges]
+        aux1 = traits[~edges]
         aux2 = distance[~edges]
-        ordered = np.vstack((ordered, aux[list(reversed(aux2.argsort()))]))
-        return ordered
+
+        ordered_objectives = np.vstack((ordered_objectives, aux[list(reversed(aux2.argsort()))]))
+        ordered_traits = np.vstack((ordered_traits, aux1[list(reversed(aux2.argsort()))]))
+
+        return ordered_traits, ordered_objectives
 
     def get_current_population(self):
         pass
@@ -221,20 +235,25 @@ class nsga(object):
 
 
 if __name__ == '__main__':
-    import libs.librarian.librarian as l
 
-    size = 1000
+    import libs.librarian.librarian as l
+    import libs.coreFactory.coreFactory as fac
+
+    size = 100
     cross_over_ratio = 0.9
     num_traits = 12
     num_objectives = 2
 
-    lib = l.librarian()
-    traits, objectives = lib.get(size)
-
-    # print(traits)
-
     n = nsga(size, num_traits, num_objectives, cross_over_ratio)
-    n.insert_initial_population(traits, objectives)
+
+    initial_population = fac.factory.generate_random_cores(100)
+
+
+
+
+
+
+    # n.insert_initial_population(traits, objectives)
 
     # print(traits, objectives)
 
