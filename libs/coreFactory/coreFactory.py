@@ -32,19 +32,36 @@ class factory(object):
     @classmethod
     def randomize_genes(cls, traits, genes):
 
+        # genes = [12]
+        print('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', genes)
+        print(traits, genes)
+
         valid = False
 
+        if 7 in genes:
+            genes.append(9)
+        if 9 in genes:
+            genes.append(7)
+
         while not valid:
+
             for gene in genes:
+                print('gene', gene)
                 gene_size = len(cls.genes_pool[gene])
                 new_gene = cls.genes_pool[gene][np.random.randint(0, gene_size)]
+                print('new_gene', new_gene)
                 while new_gene == traits[gene]:
+                    print('new_gene', new_gene)
                     new_gene = cls.genes_pool[gene][np.random.randint(0, gene_size)]
                 aux = traits
                 aux[gene] = new_gene
-                if cls.validate_core(aux):
-                    valid = True
-                    traits = aux
+
+                print('aux', aux)
+
+            if cls.validate_core(aux):
+                valid = True
+                traits = aux
+
 
         return traits
 
@@ -88,4 +105,4 @@ class factory(object):
 
 if __name__ == '__main__':
 
-    print(factory.generate_random_cores(10))
+    print(factory.generate_random_cores(1))
