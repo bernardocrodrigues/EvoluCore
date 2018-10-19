@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import libs.coreFactory.coreFactory as factory
+import libs
 import libs.eidetic.eidetic as eye
 import libs.paretoFrontier as pf
 
@@ -22,6 +23,9 @@ class nsga(object):
         self.num_objectives = num_objectives
         self.mutation_rate = 1 / num_traits
 
+        self.traits = None
+        self.objectives = None
+
     def __check_population(self, traits, objectives):
 
         if traits.shape[0] != self.population_size or objectives.shape[0] != self.population_size:
@@ -35,29 +39,28 @@ class nsga(object):
 
     def insert_initial_population(self, traits, objectives):
 
-        eye.plot([objectives], file="a.png")
-        fittest_trait, fittest_objective = self.__get_fittest(traits, objectives, 10)
-        eye.plot([fittest_objective], file="b.png")
+        self.traits = traits
+        self.objectives = objectives
 
-        # print(frontier_objectives)
+    def get_children(self):
 
-        # eye.plot_3D_no_id(frontier_objectives)
+        parents = self.__binary_tournament(self.traits)
+        children = []
+        for parent_a, parent_b in parents:
+            if np.random.uniform(0,1) < self.cross_over_ratio:
+                child_a, child_b = self.__crossover(parent_a, parent_b)
 
-        # frontier_objectives[0] = np.vstack((np.array([1000000000000, 1000000000000, 1000000000000]), frontier_objectives[0]))
+                if not factory.factory.validate_core(child_a):
+                    child_a = factory.factory.generate_random_cores(1)[0]
 
-        # eye.plot(frontier_objectives[:1])
+                if not factory.factory.validate_core(child_b):
+                    child_b = factory.factory.generate_random_cores(1)[0]
 
-        # pf.validate_frontier_set(frontier_objectives)
-
-        # parents = self.__binary_tournament(traits)
-        # children = []
-        # for parent_a, parent_b in parents:
-        #     if np.random.uniform(0,1) < self.cross_over_ratio:
-        #         child_a, child_b = self.__crossover(parent_a, parent_b)
-        #         child_a = self.__mutation(child_a)
-        #         child_b = self.__mutation(child_b)
-        #         children.append(child_a)
-        #         children.append(child_b)
+                child_a = self.__mutation(child_a)
+                child_b = self.__mutation(child_b)
+                children.append(child_a)
+                children.append(child_b)
+        return np.array(children)
 
     def __binary_tournament(self, traits):
 
@@ -171,29 +174,32 @@ class nsga(object):
         coverage_idx = 0
         population = frontier_trait[coverage_idx].shape[0]
 
-        while population < max_size:
-            coverage_idx += 1
-            population += frontier_trait[coverage_idx].shape[0]
-
-        if coverage_idx != 0:
-
-            partial_trait = np.vstack(frontier_trait[:coverage_idx])
-            partial_objective = np.vstack(frontier_objectives[:coverage_idx])
-            ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx], frontier_objectives[coverage_idx])
-            delta = max_size - partial_trait.shape[0]
-            fittest_trait = np.vstack((partial_trait, ordered_traits[:delta]))
-            fittest_objective = np.vstack((partial_objective, ordered_objectives[:delta]))
-
+        if population == max_size:
+            return frontier_trait[0], frontier_objectives[0]
         else:
-            ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx],
-                                                                                  frontier_objectives[coverage_idx])
+            while population < max_size:
+                coverage_idx += 1
+                population += frontier_trait[coverage_idx].shape[0]
 
-            delta = max_size - ordered_traits.shape[0]
-            fittest_trait = ordered_traits[:delta]
-            fittest_objective = ordered_objectives[:delta]
+            if coverage_idx != 0:
+                partial_trait = np.vstack(frontier_trait[:coverage_idx])
+                partial_objective = np.vstack(frontier_objectives[:coverage_idx])
+                ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx], frontier_objectives[coverage_idx])
+                delta = max_size - partial_trait.shape[0]
+                fittest_trait = np.vstack((partial_trait, ordered_traits[:delta]))
+                fittest_objective = np.vstack((partial_objective, ordered_objectives[:delta]))
+
+            else:
+
+                ordered_traits, ordered_objectives = self.__sort_by_crowding_distance(frontier_trait[coverage_idx],
+                                                                                      frontier_objectives[coverage_idx])
+
+                delta = max_size - ordered_traits.shape[0]
+                fittest_trait = ordered_traits[:delta]
+                fittest_objective = ordered_objectives[:delta]
 
 
-        return fittest_trait, fittest_objective
+            return fittest_trait, fittest_objective
 
     def __sort_by_crowding_distance(self, traits: np.array, objectives: np.array):
 
@@ -208,10 +214,15 @@ class nsga(object):
             distance[new_order[0]] = -1
             distance[new_order[upper - 1]] = -1
 
+            min = sorted_column[0]
+            max = sorted_column[-1]
+            denominador = max - min
+
             for idx, item in enumerate(sorted_column[1:-1]):
+
                 if distance[new_order[idx + 1]] != -1:
                     this_distance = sorted_column[idx + 2] - sorted_column[idx]
-                    distance[new_order[idx + 1]] += this_distance
+                    distance[new_order[idx + 1]] += (this_distance-min)/denominador
 
         edges = distance == -1
 
@@ -230,24 +241,70 @@ class nsga(object):
     def get_current_population(self):
         pass
 
-    def iterate_population(self, population: np.array):
-        pass
+    def iterate_population(self, traits, objectives):
+
+        try:
+            self.traits = np.vstack((self.traits, traits))
+            self.objectives = np.vstack((self.objectives, objectives))
+            self.traits, self.objectives = self.__get_fittest(self.traits, self.objectives, self.population_size)
+        except ValueError:
+            pass
+
 
 
 if __name__ == '__main__':
 
     import libs.librarian.librarian as l
+
     import libs.coreFactory.coreFactory as fac
+    import sysGen
 
     size = 100
     cross_over_ratio = 0.9
     num_traits = 12
     num_objectives = 2
+    num_generations = 5
+    experimento = 1
+    benchmark = 'adpcm'
 
-    n = nsga(size, num_traits, num_objectives, cross_over_ratio)
+    GA = nsga(size, num_traits, num_objectives, cross_over_ratio)
+    NA = sysGen.nature([benchmark])
+    lib = l.librarian_nsga()
 
-    initial_population = fac.factory.generate_random_cores(100)
+    lib.create_experimento(experimento, size, cross_over_ratio, num_traits, num_objectives, num_generations, benchmark)
 
+
+    # initial_population = fac.factory.generate_random_cores(8)
+    # traits, objectives = natur.life(initial_population)
+
+    aux_trait, aux_objective = lib.get(100)
+    traits = aux_trait[:50]
+    objectives = aux_objective[:50]
+
+    eye.plot([objectives], file="a.png")
+
+    n.insert_initial_population(traits, objectives)
+
+    # for generation in range(num_generations):
+
+    children = n.get_children()
+
+    traits, objectives = natur.life(children)
+
+    eye.plot([objectives], file="a.png")
+
+
+
+
+
+    # get initial population
+    # nsga.insert initial population
+    # while rodando:
+        #nsga. get children
+        #        eye.plot([fittest_objective], file="b.png")
+        #benchmark children
+        #insert children
+        #get new population
 
 
 

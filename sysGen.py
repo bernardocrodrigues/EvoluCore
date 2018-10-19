@@ -7,6 +7,7 @@ import xmlParse
 from libs.millenium.millenium import db
 import traceback
 import libs.coreFactory.coreFactory as fac
+import numpy as np
 
 
 class log:
@@ -95,9 +96,14 @@ class nourish(Process):
                 os.makedirs(self.__workingDir)
             else:
                 os.makedirs(self.__workingDir)
-        except OSError:
-            print('Erro no setup das pastas')
-            exit(1)
+        except (OSError, FileNotFoundError):
+            if os.path.isdir(self.__workingDir):
+                shutil.rmtree(self.__workingDir)
+                os.makedirs(self.__workingDir)
+            else:
+                os.makedirs(self.__workingDir)
+            # print('Erro no setup das pastas')
+            # exit(1)
 
     def _populateQsys(self):
 
@@ -173,7 +179,6 @@ class nourish(Process):
 
             log.begin_task(self.__pid, str(self.actual_idx), "Got core " + str(self.actual_idx))
 
-
             self.__qFac.modifyNios(fac.factory.format_core_dict(individual))
             self.__qFac.writeCurrentQsys('q' + str(self.actual_idx) + '.qsys')
             self.__qFac.resetCurrentQsys()
@@ -183,21 +188,26 @@ class nourish(Process):
             log.end_task(self.__pid, str(self.actual_idx), "QSYS files and folders")
 
             log.begin_task(self.__pid, str(self.actual_idx), "Compiling QSYS")
-            self._populateQsys()
-            log.end_task(self.__pid, str(self.actual_idx), "Compiling QSYS")
+            try:
+                self._populateQsys()
+            except AssertionError:
+                self.__output.put((self.actual_idx, -1))
+                log.error_message(self.__pid, str(self.actual_idx), "Qsys FAIL")
+            else:
+                log.end_task(self.__pid, str(self.actual_idx), "Compiling QSYS")
 
-            log.begin_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
-            self._compileQuartus()
-            log.end_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
+                log.begin_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
+                self._compileQuartus()
+                log.end_task(self.__pid, str(self.actual_idx), "Compiling Quartus Project")
 
-            log.begin_task(self.__pid, str(self.actual_idx), "Compiling Software")
-            self._compileSoftware(self.__kernel)
-            log.end_task(self.__pid, str(self.actual_idx), "Compiling Software")
-            #
+                log.begin_task(self.__pid, str(self.actual_idx), "Compiling Software")
+                self._compileSoftware(self.__kernel)
+                log.end_task(self.__pid, str(self.actual_idx), "Compiling Software")
+                #
 
-            log.success(self.__pid, str(self.actual_idx))
+                log.success(self.__pid, str(self.actual_idx))
 
-            self.__output.put((self.actual_idx, individual))
+                self.__output.put((self.actual_idx, individual))
 
             #
             #     except Exception:
@@ -209,7 +219,7 @@ class nourish(Process):
 
 class colosseum(Process):
 
-    def __init__(self, rootDir, prefix, referenceDir, cable, input, result, cleanUp, kernel):
+    def __init__(self, rootDir, prefix, referenceDir, cable, input, result, cleanUp, kernel, fpga_metrics):
 
         Process.__init__(self)
         self.__rootDir = rootDir
@@ -224,6 +234,7 @@ class colosseum(Process):
         self.__input = input
         self.__running = Value('d', 1)
         self.__kernel = kernel
+        self.__fpga_metrics = fpga_metrics
 
 
     def _configureBoard(self):
@@ -326,7 +337,8 @@ class colosseum(Process):
                     used = int(parsed[0].replace(',', ''))
                     total = int(parsed[1].replace(',', ''))
 
-                    result.append(used)
+                    if 'alm' in self.__fpga_metrics:
+                        result.append(used)
 
                 if 'block memory bits' in line:
                     parsed = parse.parse(format_string_memory, line)
@@ -334,7 +346,8 @@ class colosseum(Process):
                     used = int(parsed[0].replace(',', ''))
                     total = int(parsed[1].replace(',', ''))
 
-                    result.append(used)
+                    if 'memory' in self.__fpga_metrics:
+                        result.append(used)
 
                 if 'Total RAM Blocks' in line:
                     parsed = parse.parse(format_string_ram, line)
@@ -342,7 +355,8 @@ class colosseum(Process):
                     used = int(parsed[0].replace(',', ''))
                     total = int(parsed[1].replace(',', ''))
 
-                    result.append(used)
+                    if 'ram' in self.__fpga_metrics:
+                        result.append(used)
 
             return result
 
@@ -365,52 +379,57 @@ class colosseum(Process):
             except Exception:
                 time.sleep(1)
             else:
-                self.actual_idx = str(self.__current[0])
-
-                log.bench_begin_task(self.__pid, self.actual_idx, "Got core " + self.actual_idx)
-                self.__workingDir = self.__rootDir + '/' + self.actual_idx + '/'
-
-                try:
-                    log.bench_begin_task(self.__pid, self.actual_idx, "Configuring Board")
-                    self._configureBoard()
-                    log.bench_end_task(self.__pid, self.actual_idx, "Configuring Board")
-                except FileNotFoundError:
-                    log.error_message(self.__pid, self.actual_idx, "ERROR! Invalid Core")
-                    self.__result.put((self.__current[1]), -1)
-                except Exception:
-                    log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
+                print(self.__current)
+                if self.__current[1] == -1:
+                    self.__result.put((self.__current[0], -1))
                 else:
 
-                    log.bench_begin_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
-                    result = self._getUsageData()
-                    # result['id'] = int(self.actual_idx)
-                    log.bench_end_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
+                    self.actual_idx = str(self.__current[0])
 
-                    log.bench_begin_task(self.__pid, self.actual_idx, "Benchmarking")
-                    for benchmark in self.__kernel:
+                    log.bench_begin_task(self.__pid, self.actual_idx, "Got core " + self.actual_idx)
+                    self.__workingDir = self.__rootDir + '/' + self.actual_idx + '/'
 
-                        aux = []
+                    try:
+                        log.bench_begin_task(self.__pid, self.actual_idx, "Configuring Board")
+                        self._configureBoard()
+                        log.bench_end_task(self.__pid, self.actual_idx, "Configuring Board")
+                    except FileNotFoundError:
+                        log.error_message(self.__pid, self.actual_idx, "ERROR! Invalid Core")
+                        self.__result.put((self.__current[1]), -1)
+                    except Exception:
+                        log.bench_error_message(self.__pid, self.__current, "ERROR! \n" + traceback.format_exc())
+                    else:
 
-                        log.bench_begin_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
-                        self._transferCode(benchmark)
-                        log.bench_end_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
+                        log.bench_begin_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
+                        result = self._getUsageData()
+                        # result['id'] = int(self.actual_idx)
+                        log.bench_end_task(self.__pid, self.actual_idx, "Fetching FPGA usage data")
 
-                        log.bench_begin_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
-                        media, times = self._benchmark(benchmark)
-                        log.bench_end_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
+                        log.bench_begin_task(self.__pid, self.actual_idx, "Benchmarking")
+                        for benchmark in self.__kernel:
 
-                        aux.append(media)
+                            aux = []
 
-                        result = aux + result
+                            log.bench_begin_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
+                            self._transferCode(benchmark)
+                            log.bench_end_task(self.__pid, self.actual_idx, "Transfering "+ benchmark)
 
-                    # print((self.__current[1], tuple(result)))
-                    self.__result.put((self.__current[1], tuple(result)))
+                            log.bench_begin_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
+                            media, times = self._benchmark(benchmark)
+                            log.bench_end_task(self.__pid, self.actual_idx, "Getting results from " + benchmark)
 
-                    if self.__cleanUp:
-                        self._cleanUp()
-                        log.bench_end_task(self.__pid, self.actual_idx, "Cleaning up ")
+                            aux.append(media)
 
-                log.bench_end_task(self.__pid,  self.actual_idx, "Benchmarking")
+                            result = aux + result
+
+                        # print((self.__current[1], tuple(result)))
+                        self.__result.put((self.__current[1], tuple(result)))
+
+                        if self.__cleanUp:
+                            self._cleanUp()
+                            log.bench_end_task(self.__pid, self.actual_idx, "Cleaning up ")
+
+                    log.bench_end_task(self.__pid,  self.actual_idx, "Benchmarking")
 
         log.bench_exit_message(self.__pid)
 
@@ -870,7 +889,7 @@ class TestBench(Process):
 
 class nature():
 
-    def __init__(self, kernel):
+    def __init__(self, kernel, fpga):
 
         self.target = "/home/bcrodrigues/tcc/"
         self.base = "/home/bcrodrigues/Dropbox/tcc/script/base/"
@@ -878,10 +897,15 @@ class nature():
         self.interface = Queue()
         self.prefix = 'q'
         self.kernel = kernel
+        self.fpga = fpga
 
     def life(self, population):
 
+        # print('Population in nature:', population)
+
         step = int(population.shape[0]/4)
+
+        # print(step, len(population[0:step]), len(population[step:step*2]), len(population[step*2:step*3]), len(population[step*3:]))
 
         gen1 = nourish(self.target, self.prefix, self.base, population[0:step], self.interface, 0, self.kernel)
         gen2 = nourish(self.target, self.prefix, self.base, population[step:step*2], self.interface, step, self.kernel)
@@ -893,22 +917,11 @@ class nature():
         gen3.start()
         gen4.start()
 
-        gen1.join()
-        gen2.join()
-        gen3.join()
-        gen4.join()
-
-        # self.interface.put((0,'a'))
-        # self.interface.put((1,'a'))
-        # self.interface.put((2,'a'))
-        # self.interface.put((3,'a'))
-
-
-        arena1 = colosseum(self.target, self.prefix, self.base, 1, self.interface, self.result,  True, self.kernel)
-        arena2 = colosseum(self.target, self.prefix, self.base, 2, self.interface, self.result,  True, self.kernel)
+        arena1 = colosseum(self.target, self.prefix, self.base, 1, self.interface, self.result, False, self.kernel, self.fpga)
+        # arena2 = colosseum(self.target, self.prefix, self.base, 2, self.interface, self.result,  True, self.kernel)
 
         arena1.start()
-        arena2.start()
+        # arena2.start()
 
 
         traits = []
@@ -916,28 +929,21 @@ class nature():
 
         while len(traits) < population.shape[0]:
             aux = self.result.get()
-            traits.append(aux[0])
-            objectives.append(aux[1])
+            if aux[1] != -1:
+                traits.append(aux[0])
+                objectives.append(aux[1])
+            else:
+                core = fac.factory.generate_random_cores(1)
+                gen_aux = nourish(self.target, self.prefix, self.base, core, self.interface, aux[0], self.kernel)
+                gen_aux.start()
 
 
-        print(traits)
 
-        print('\n\n')
-
-        print(objectives)
 
         arena1.shutdown()
-        arena2.shutdown()
+        # arena2.shutdown()
 
-
-        # print(finish_line)
-
-        # gen1.start()
-        # gen2.start()
-        # gen3.start()
-        # gen4.start()
-        # ben1.start()
-        # ben2.start()
+        return np.array(traits), np.array(objectives)
 
 
 
@@ -951,6 +957,6 @@ if __name__ == '__main__':
     cores = fac.factory.generate_random_cores(4)
     # print(cores)
 
-    natur = nature(['adpcm'])
+    natur = nature(['adpcm'], ['alm'])
 
     natur.life(cores)
