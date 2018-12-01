@@ -35,9 +35,9 @@ size = 50
 cross_over_ratio = 0.9
 num_traits = 12
 num_objectives = 3
-num_generations = 20
-experimento = 20
-benchmark = 'adpcm'
+num_generations = 30
+experimento = 31
+benchmark = 'quicksort'
 
 GA = nsga(size, num_traits, num_objectives, cross_over_ratio)
 NA = sysGen.nature([benchmark], ['alm', 'memory'])

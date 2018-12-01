@@ -1,18 +1,15 @@
-
 import sqlite3
 import numpy as np
 
 
 class librarian_milenium(object):
 
-
-
     def __init__(self):
 
         self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
         # self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/nsga.db')
 
-    def get_data(self, limit = None) -> np.array:
+    def get_data(self, limit=None) -> np.array:
 
         cur = self.__conn.cursor()
         if limit != None:
@@ -20,24 +17,35 @@ class librarian_milenium(object):
         else:
             return np.array(cur.execute("select id_core, adpcm, alm from core").fetchall())
 
-    def get_benchmark_data(self, benchmark = "adpcm", metrics: list = None, limit = None) -> np.array:
+    def get_benchmark_data(self, benchmark="adpcm", metrics: list = None, limit=None) -> np.array:
 
         cur = self.__conn.cursor()
+        query = '''select 
+                         dcache_size, 
+                         dcache_bursts,                                                
+                         dcache_victim_buf_impl, 
+                         icache_size, 
+                         icache_burstType, 
+                         setting_support31bitdcachebypass, 
+                         dividerType, 
+                         mul_32_impl, 
+                         shift_rot_impl, 
+                         mul_64_impl, 
+                         setting_bhtPtrSz, 
+                         setting_branchpredictiontype, '''
+
         if metrics == None:
-            query = "select id_core, " + benchmark + ", alm, memory, ram from core"
-            if limit != None:
-                return np.array(cur.execute(query).fetchmany(limit))
-            else:
-                return np.array(cur.execute(query).fetchall())
+            query += benchmark + ", alm, memory, ram from core"
         else:
-            query = "select id_core, " + benchmark + ", "
+            query += benchmark + ", "
             for metric in metrics:
                 query += (metric + ", ")
-            query = query[:-2] +" from core"
-            if limit != None:
-                return np.array(cur.execute(query).fetchmany(limit))
-            else:
-                return np.array(cur.execute(query).fetchall())
+            query = query[:-2] + " from core"
+
+        if limit != None:
+            return np.array(cur.execute(query).fetchmany(limit))
+        else:
+            return np.array(cur.execute(query).fetchall())
 
     def get_core_characteristics(self, id_core: int):
         cur = self.__conn.cursor()
@@ -54,34 +62,41 @@ class librarian_milenium(object):
                                      mul_64_impl, 
                                      setting_bhtPtrSz, 
                                      setting_branchpredictiontype 
-                                     from core where id_core='''+str(id_core)).fetchone()
+                                     from core where id_core=''' + str(id_core)).fetchone()
 
-    def get(self, limit = None):
+    def get(self, limit=None):
         cur = self.__conn.cursor()
-#TODO: POR RAM, memory DE VOLTA NA BUSCA
+        # TODO: POR RAM, memory DE VOLTA NA BUSCA
         query = '''select 
-                         dcache_size, 
-                         dcache_bursts,                                                
-                         dcache_victim_buf_impl, 
-                         icache_size, 
-                         icache_burstType, 
-                         setting_support31bitdcachebypass, 
-                         dividerType, 
-                         mul_32_impl, 
-                         shift_rot_impl, 
-                         mul_64_impl, 
-                         setting_bhtPtrSz, 
-                         setting_branchpredictiontype,
-                         adpcm, 
-                         alm,
-                         memory
+                            dcache_size,
+                            dcache_bursts,
+                            dcache_victim_buf_impl,
+                            icache_size,
+                            icache_burstType,
+                            setting_support31bitdcachebypass,
+                            dividerType,
+                            mul_32_impl,
+                            shift_rot_impl,
+                            mul_64_impl,
+                            setting_bhtPtrSz,
+                            setting_branchpredictiontype,
+                            adpcm,
+                            sobel,
+                            vecsum,
+                            quicksort,
+                            dotprod,
+                            alm,
+                            memory,
+                            ram 
                     from core'''
+
         if limit != None:
             aux = np.array(cur.execute(query).fetchmany(limit))
             return aux[:, :12], aux[:, 12:].astype(float)
         else:
             aux = np.array(cur.execute(query).fetchall())
             return aux[:, :12], aux[:, 12:].astype(float)
+
 
 class librarian_nsga(object):
 
@@ -93,7 +108,7 @@ class librarian_nsga(object):
 
                         DROP TABLE IF EXISTS experimento;
                         DROP TABLE IF EXISTS core;
-                        
+
                         create table experimento(
                                                 id_experimento INTEGER PRIMARY KEY,
                                                 size INTEGER,
@@ -132,7 +147,8 @@ class librarian_nsga(object):
     def insert_population(self, traits: np.array, objectives: np.array):
         pass
 
-    def create_experimento(self, id_experimento, size, cross_over_ratio, num_traits, num_objectives, num_generations, benchmark):
+    def create_experimento(self, id_experimento, size, cross_over_ratio, num_traits, num_objectives, num_generations,
+                           benchmark):
         cur = self.__conn.cursor()
         cur.execute("PRAGMA foreign_keys = 1")
 
@@ -247,7 +263,8 @@ class librarian_nsga(object):
 
         cur = self.__conn.cursor()
         cur.execute("PRAGMA foreign_keys = 1")
-        result = cur.execute("select * from core where id_experimento=? and geracao=?", (id_experiment, generation)).fetchall()
+        result = cur.execute("select * from core where id_experimento=? and geracao=? and filho=0",
+                             (id_experiment, generation)).fetchall()
         return result
 
     def get_experiment_meta(self, id_experiment):
@@ -259,7 +276,7 @@ class librarian_nsga(object):
 
     def get_experiment_data(self, id_experiment):
         meta = self.get_experiment_meta(id_experiment)
-        num_gen =  meta[5]
+        num_gen = meta[5]
 
         generations = []
 
@@ -267,36 +284,148 @@ class librarian_nsga(object):
             generation = self.get_generation(id_experiment, gen)
             generations.append(generation)
 
-
         return generations
 
     def get_last_population(self, id_experiment, objective_num):
 
         cur = self.__conn.cursor()
         cur.execute("PRAGMA foreign_keys = 1")
-        last_generation = cur.execute("select max(geracao) from core where id_experimento =? and filho=0", (id_experiment,)).fetchone()[0]
+        last_generation = \
+        cur.execute("select max(geracao) from core where id_experimento =? and filho=0", (id_experiment,)).fetchone()[0]
 
         data = np.array(self.get_generation(id_experiment, last_generation))
 
-        traits = data[:,:12]
-        objectives = data[:,12:12+objective_num].astype(float)
+        traits = data[:, :12]
+        objectives = data[:, 12:12 + objective_num].astype(float)
 
         return last_generation, traits, objectives
 
 
+class librarian_milenium_bootstrap(object):
+
+    def __init__(self):
+
+        self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium_bootsrap.db')
+
+    def init(self):
+        self.__conn.executescript("""
+                        DROP TABLE IF EXISTS core;
+                        create table core(
+                                            dcache_size TEXT,
+                                            dcache_bursts TEXT,
+                                            dcache_victim_buf_impl TEXT,
+                                            icache_size TEXT,
+                                            icache_burstType TEXT,
+                                            setting_support31bitdcachebypass TEXT,
+                                            dividerType TEXT,
+                                            mul_32_impl TEXT,
+                                            shift_rot_impl TEXT,
+                                            mul_64_impl TEXT,
+                                            setting_bhtPtrSz TEXT,
+                                            setting_branchpredictiontype TEXT,
+                                            adpcm INTEGER DEFAULT 0,
+                                            sobel INTEGER DEFAULT 0,
+                                            vecsum INTEGER DEFAULT 0,
+                                            quicksort INTEGER DEFAULT 0,
+                                            dotprod INTEGER DEFAULT 0,
+                                            alm INTEGER  DEFAULT 0,
+                                            memory INTEGER  DEFAULT 0,
+                                            ram INTEGER DEFAULT 0,
+                                            iteracao INTEGER
+                                         );
+                    """)
+
+    def insert_iteration(self, iteration, traits, objectives):
+
+        cur = self.__conn.cursor()
+        cur.execute("PRAGMA foreign_keys = 1")
+
+        # print(traits, objectives)
+
+        for trait, objective in zip(traits, objectives):
+
+            try:
+                aux = trait + objective
+            except TypeError:
+                aux = np.hstack((trait, objective))
+
+            try:
+                aux += (iteration,)
+            except TypeError:
+                aux = np.hstack((aux, (iteration,)))
+
+            cur.execute('''insert into core(
+                                            dcache_size,
+                                            dcache_bursts,
+                                            dcache_victim_buf_impl,
+                                            icache_size,
+                                            icache_burstType,
+                                            setting_support31bitdcachebypass,
+                                            dividerType,
+                                            mul_32_impl,
+                                            shift_rot_impl,
+                                            mul_64_impl,
+                                            setting_bhtPtrSz,
+                                            setting_branchpredictiontype,
+                                            adpcm,
+                                            sobel,
+                                            vecsum,
+                                            quicksort,
+                                            dotprod,
+                                            alm,
+                                            memory,
+                                            ram,
+                                            iteracao) 
+                                            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', aux)
+
+        self.__conn.commit()
+
+    def get_last_iteration(self):
+
+        cur = self.__conn.cursor()
+        cur.execute("PRAGMA foreign_keys = 1")
+        last_generation = cur.execute("select max(iteracao) from core").fetchone()[0]
+
+        data = self.get_generation(last_generation)
+
+        try:
+            traits = data[:,:12]
+            objectives = data[:, 12:].astype(float)
+        except TypeError:
+            return -1, [], []
+        else:
+            return last_generation, traits, objectives
+
+    def get_generation(self, iteracao):
+
+        cur = self.__conn.cursor()
+        cur.execute("PRAGMA foreign_keys = 1")
+        result = cur.execute("select * from core where iteracao=?", (iteracao,)).fetchall()
+        try:
+            result = np.array(result)[:,:-1]
+        except IndexError:
+            result = []
+        return result
 
 
 
 if __name__ == "__main__":
+    lib = librarian_milenium_bootstrap()
+    lib2 = librarian_milenium()
+    traits, objectives = lib2.get(1)
 
-    lib = librarian_nsga()
+    # print(traits, objectives)
+
+    # lib.init()
+
+    lib.insert_iteration(5, traits, objectives)
+    print(lib.get_last_iteration())
 
     # lib_old = librarian_milenium()
     # traits, objectives = lib_old.get(10)
     # lib.init()
 
-    print(lib.get_last_population(5,2))
-
+    # print(lib.get_last_population(5,2))
 
     # size = 10
     # cross_over_ratio = 0.9
@@ -311,8 +440,6 @@ if __name__ == "__main__":
     # lib.insert_children(experimento, 0, traits)
 
     # print(traits,objectives)
-
-
 
     # print(lib.get_benchmark_data(limit=5, metrics=["alm, memory"]))
     # print(lib.get_core_characteristics(10))

@@ -272,12 +272,14 @@ class colosseum(Process):
                 subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                 returnCode = code.returncode
                 retry += 1
-                if retry > 5:
+                if retry >= 1:
                     break
 
             if returnCode != 0:
+
                 subprocess.run(["killall", "jtagd"])
                 self._configureBoard()
+
             else:
                 subprocess.run(["nios2-download", "-c", str(self.__cable), "-g"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                 confiredProperly = True
@@ -671,7 +673,7 @@ class Generator_on_db(Process):
                         break
 
                     log.begin_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
-                    self._compileSoftware(['sobel', 'quick_sort', 'adpcm', 'dotprod', 'vecsum'])
+                    self._compileSoftware(['sobel', 'quicksort', 'adpcm', 'dotprod', 'vecsum'])
                     log.end_task(self.__pid, str(self.__current['id_core']), "Compiling Software")
 
                     self.__db.get_core_ready_to_bench(self.__current['id_core'])
@@ -861,7 +863,7 @@ class TestBench(Process):
                     log.bench_end_task(self.__pid, self.__current, "Fetching FPGA usage data")
 
                     log.bench_begin_task(self.__pid, self.__current, "Benchmarking")
-                    for benchmark in ['sobel', 'quick_sort', 'adpcm', 'dotprod', 'vecsum']:
+                    for benchmark in ['sobel', 'quicksort', 'adpcm', 'dotprod', 'vecsum']:
 
                         aux= {}
 
