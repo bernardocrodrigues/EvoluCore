@@ -1066,13 +1066,13 @@ class eidetic(object):
                                         ],
                                hovermode='closest',
                                xaxis=dict(
-                                   title="Hipervolume",
+                                   title="Hypervolume",
                                    # ticklen=5,
                                    # zeroline=False,
                                    # gridwidth=2,
                                ),
                                yaxis=dict(
-                                   title="Ocorrencia",
+                                   title="Occurrence",
                                    # ticklen=5,
                                    # gridwidth=2,
                                ),
@@ -1204,6 +1204,8 @@ class eidetic(object):
 
 if __name__ == "__main__":
     # pass
+    import sys, os
+    sys.path.append(os.path.abspath("/home/bcrodrigues/Projects/EvoluCore/"))
 
     import libs.librarian.librarian as l
     import libs.paretoFrontier.paretoFrontier as pf
@@ -1211,7 +1213,7 @@ if __name__ == "__main__":
     lib2 = l.librarian_milenium()
 
     # 3, 6
-    experiments_to_run = [14]
+    experiments_to_run = [11,12]
 
 
 
@@ -1236,9 +1238,9 @@ if __name__ == "__main__":
         dominated_objectives = eidetic.normalize_coll(dominated_objectives, 1, alm[1], alm[0])
 
         eidetic.final_plot_2d([dominated_objectives, objective_frontier],
-                              labels=["Dominados", "Fronteira de Pareto"],
-                              x_label="Cilcos de Máquina adpcm",
-                              y_label="Uso de elementos lógicos")
+                              labels=["Dominated Solutions", "Estimated Pareto frontier"],
+                              x_label="f_execution",
+                              y_label="f_alm")
 
     # bootstrap no mil 2 objetivos
     if 3 in experiments_to_run:
@@ -1272,7 +1274,7 @@ if __name__ == "__main__":
             trace = go.Scatter(
                 y=to_plot,
                 x=list(range(20)),
-                name= "Execução " +str(aux+1),
+                name= "Experiment " +str(aux+1),
                 line = dict(
                     # color=('rgb(205, 12, 24)'),
                     width=1)
@@ -1307,13 +1309,13 @@ if __name__ == "__main__":
                                    ],
                            hovermode='closest',
                            xaxis=dict(
-                               title="Geração",
+                               title="Generation",
                                # ticklen=5,
                                # zeroline=False,
                                # gridwidth=2,
                            ),
                            yaxis=dict(
-                               title="Hipervolume",
+                               title="Hypervolume",
                                # ticklen=5,
                                # gridwidth=2,
                            ),
@@ -1389,7 +1391,7 @@ if __name__ == "__main__":
         valid = [10,16,17,18,19]
         data = [go.Box(y=mil_boot,
                                boxpoints=False,
-                               name="Mil cores",
+                               name="Baseline",
                                # jitter=0.3,
                                # pointpos=-1.8
                                )]
@@ -1401,14 +1403,14 @@ if __name__ == "__main__":
 
             data.append(go.Box(y=eidetic.bootstrap_hypervome(exp, 1000, histogram=False),
                                boxpoints=False,
-                               name= "NSGA " + str(aux+1)
+                               name= "Exp. " + str(aux+1)
                                # jitter=0.3,
                                # pointpos=-1.8
                                ))
 
         layout = go.Layout(
             yaxis=dict(
-                title="Hipervolume",
+                title="Hypervolume",
                 # ticklen=5,
                 # gridwidth=2,
             )
@@ -1567,13 +1569,13 @@ if __name__ == "__main__":
         layout = go.Layout(
                            hovermode='closest',
                            xaxis=dict(
-                               title="Geração",
+                               title="Generation",
                                # ticklen=5,
                                # zeroline=False,
                                # gridwidth=2,
                            ),
                            yaxis=dict(
-                               title="Hipervolume",
+                               title="Hypervolume",
                                # ticklen=5,
                                # gridwidth=2,
                            ),
@@ -1737,7 +1739,7 @@ if __name__ == "__main__":
             boxpoints=False,
             y= y_m,
             x= x_m,
-            name='Mil Cores',
+            name='Baseline',
             marker=dict(
                 color='#3D9970'
             )
@@ -1747,7 +1749,7 @@ if __name__ == "__main__":
             boxpoints=False,
             y= y_n,
             x= x_n,
-            name='NSGA',
+            name='NSGA-II',
             marker=dict(
                 color='#FF4136'
             )
@@ -1762,12 +1764,12 @@ if __name__ == "__main__":
             # },
             boxmode= 'group',
             yaxis=dict(
-                title="Hipervolume",
+                title="Hypervolume",
                 # ticklen=5,
                 # gridwidth=2,
             ),
             xaxis = dict(
-                title="Kernel",
+                title="Benchmark",
                 # ticklen=5,
                 # gridwidth=2,
             )

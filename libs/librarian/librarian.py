@@ -6,7 +6,7 @@ class librarian_milenium(object):
 
     def __init__(self):
 
-        self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/millenium.db', isolation_level='EXCLUSIVE')
+        self.__conn = sqlite3.connect('/home/bcrodrigues/Projects/EvoluCore/millenium.db', isolation_level='EXCLUSIVE')
         # self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/nsga.db')
 
     def get_data(self, limit=None) -> np.array:
@@ -101,7 +101,7 @@ class librarian_milenium(object):
 class librarian_nsga(object):
 
     def __init__(self):
-        self.__conn = sqlite3.connect('/home/bcrodrigues/Dropbox/tcc/script/nsga.db')
+        self.__conn = sqlite3.connect('//home/bcrodrigues/Projects/EvoluCore/nsga.db')
 
     def init(self):
         self.__conn.executescript("""
