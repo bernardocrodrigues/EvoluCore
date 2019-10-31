@@ -1,0 +1,22 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pytest = "==4.3.0"
+pytest-cov = "==2.7.1"
+setuptools = "*"
+wheel = "*"
+flake8 = "==3.7.8"
+coverage = "==4.5.3"
+mock = "==3.0.5"
+pyyaml = "==5.1.1"
+
+[packages]
+numpy = "*"
+parse = "*"
+lxml = "*"
+
+[requires]
+python_version = "3.7.3"

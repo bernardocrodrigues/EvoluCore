@@ -1,4 +1,4 @@
-import libs.eidetic.eidetic as eye
+#import libs.eidetic.eidetic as eye
 import libs.coreFactory.coreFactory as fac
 import sysGen
 import libs.evo.nsga as nsga
